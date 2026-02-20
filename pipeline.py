@@ -908,6 +908,13 @@ async def async_main(args):
     """Single async entry point — one event loop, one client."""
     force = args.force
 
+    # Publish-only: just push existing data to Supabase
+    if args.publish_only:
+        from publisher import publish, get_campaign_id
+        campaign_id = get_campaign_id(None)
+        publish(campaign_id)
+        return
+
     # Pass 0: preprocess videos (sync, no API client needed)
     if args.preprocess_only:
         _image_paths, video_paths = _load_media()
@@ -1027,6 +1034,12 @@ async def async_main(args):
 
         print_summary(output, meta_summary)
 
+        # Publish to Supabase if requested
+        if args.publish:
+            from publisher import publish, get_campaign_id
+            campaign_id = get_campaign_id(None)
+            publish(campaign_id)
+
     finally:
         await client.close()
 
@@ -1071,6 +1084,11 @@ def main():
         action="store_true",
         help="Skip generation, upload existing output to Meta",
     )
+    group.add_argument(
+        "--publish-only",
+        action="store_true",
+        help="Publish existing output to Supabase for dashboard (no generation)",
+    )
     parser.add_argument(
         "--subgroup-copy",
         action="store_true",
@@ -1085,6 +1103,11 @@ def main():
         "--force",
         action="store_true",
         help="Re-run all passes from scratch, ignoring cached checkpoints",
+    )
+    parser.add_argument(
+        "--publish",
+        action="store_true",
+        help="Publish pipeline output to Supabase for dashboard (runs after all passes)",
     )
     args = parser.parse_args()
 

@@ -184,12 +184,21 @@ export interface DateRange {
   until: string; // YYYY-MM-DD
 }
 
+export interface AdActionSummary {
+  kill: number;
+  watch: number;
+  scale: number;
+  starving: number;
+  total: number;
+}
+
 export interface AdSetRow {
   id: string;
   name: string;
   status: string;
   metrics: ComputedMetrics;
   recommendation: Recommendation;
+  adActions?: AdActionSummary;
   conceptName?: string;
   conceptDisplayName?: string;
   awarenessStage?: string;
@@ -205,6 +214,11 @@ export interface AdRow {
   conceptName?: string;
   subGroupName?: string;
   mediaType?: string;
+}
+
+export interface DailyMetricRow {
+  date: string;
+  metrics: ComputedMetrics;
 }
 
 export interface WinnerAd {

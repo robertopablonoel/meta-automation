@@ -109,7 +109,7 @@ export function getMetricColor(key: string, value: number): string {
 
   let target = benchmark.target;
   if (benchmark.dynamic && benchmark.key === "cpa") {
-    target = getCpaTarget(69.95); // default front-end price
+    target = getCpaTarget(69.95);
   }
 
   if (benchmark.comparison === "less_than") {

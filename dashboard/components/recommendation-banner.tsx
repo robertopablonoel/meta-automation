@@ -25,17 +25,22 @@ const bannerStyles: Record<string, { bg: string; border: string; icon: string }>
   },
 };
 
-const actionLabels: Record<string, string> = {
-  Kill: "Kill — Turn off this ad set",
-  Watch: "Watch — Needs more data",
-  Scale: "Scale — Increase budget",
-  Starving: "Starving — Not enough spend",
-};
+function getActionLabel(action: string, entityLabel: string): string {
+  switch (action) {
+    case "Kill": return `Kill — Turn off this ${entityLabel}`;
+    case "Watch": return `Watch — Needs more data`;
+    case "Scale": return `Scale — Increase budget`;
+    case "Starving": return `Starving — Not enough spend`;
+    default: return action;
+  }
+}
 
 export function RecommendationBanner({
   recommendation,
+  entityLabel = "ad",
 }: {
   recommendation: Recommendation;
+  entityLabel?: string;
 }) {
   const style = bannerStyles[recommendation.action] || bannerStyles.Watch;
 
@@ -50,7 +55,7 @@ export function RecommendationBanner({
         </div>
         <div className="flex-1 min-w-0">
           <h3 className={`text-sm font-semibold ${style.icon}`}>
-            {actionLabels[recommendation.action]}
+            {getActionLabel(recommendation.action, entityLabel)}
           </h3>
           <ul className="mt-1.5 space-y-0.5">
             {recommendation.reasoning.map((r, i) => (

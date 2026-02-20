@@ -146,7 +146,16 @@ export function AdSetTable({ adsets, campaignId }: Props) {
                 )}
               </TableCell>
               <TableCell>
-                <RecommendationBadge recommendation={adset.recommendation} />
+                {adset.adActions && adset.adActions.kill > 0 ? (
+                  <div className="flex items-center gap-1.5">
+                    <RecommendationBadge recommendation={adset.recommendation} />
+                    <span className="text-[11px] text-red-600 dark:text-red-400 whitespace-nowrap">
+                      {adset.adActions.kill} ad{adset.adActions.kill > 1 ? "s" : ""} to kill
+                    </span>
+                  </div>
+                ) : (
+                  <RecommendationBadge recommendation={adset.recommendation} />
+                )}
               </TableCell>
               <TableCell className="tabular-nums text-sm">{formatCurrency(adset.metrics.spend)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("cpc", adset.metrics.cpc)}`}>{formatCurrency(adset.metrics.cpc)}</TableCell>

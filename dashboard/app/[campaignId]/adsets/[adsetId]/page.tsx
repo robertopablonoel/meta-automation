@@ -18,7 +18,7 @@ import { softBenchmarks, hardBenchmarks } from "@/lib/benchmarks";
 import { parseAdName } from "@/lib/meta-fields";
 import type { AdRow, ComputedMetrics } from "@/lib/types";
 
-const FRONT_END_PRICE = parseFloat(process.env.NEXT_PUBLIC_FRONT_END_PRICE || "29.99");
+const FRONT_END_PRICE = parseFloat(process.env.NEXT_PUBLIC_FRONT_END_PRICE || "69.95");
 
 export default function AdSetDetail() {
   const { campaignId, adsetId } = useParams<{
@@ -126,7 +126,7 @@ export default function AdSetDetail() {
 
       {/* Recommendation banner */}
       {adsetRecommendation && (
-        <RecommendationBanner recommendation={adsetRecommendation} />
+        <RecommendationBanner recommendation={adsetRecommendation} entityLabel="ad set" />
       )}
 
       {/* Concept card */}

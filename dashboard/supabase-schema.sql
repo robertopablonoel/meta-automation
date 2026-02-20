@@ -89,6 +89,22 @@ CREATE INDEX IF NOT EXISTS idx_mc_adsets ON metrics_cache(campaign_id, entity_ty
 CREATE INDEX IF NOT EXISTS idx_mc_ads_by_adset ON metrics_cache(parent_id, entity_type) WHERE entity_type = 'ad';
 CREATE INDEX IF NOT EXISTS idx_mc_ads_by_campaign ON metrics_cache(campaign_id, entity_type) WHERE entity_type = 'ad';
 
+-- Daily metric snapshots (populated by metrics_sync.py with time_increment=1)
+CREATE TABLE IF NOT EXISTS daily_snapshots (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  entity_type TEXT NOT NULL,
+  entity_id TEXT NOT NULL,
+  campaign_id TEXT NOT NULL,
+  date DATE NOT NULL,
+  insights JSONB,
+  synced_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(entity_type, entity_id, date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ds_campaign_date
+  ON daily_snapshots(campaign_id, entity_type, date)
+  WHERE entity_type = 'campaign';
+
 -- Sync run log
 CREATE TABLE IF NOT EXISTS sync_log (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,

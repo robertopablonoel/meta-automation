@@ -126,15 +126,14 @@ export function getRecommendation(
     return { action: "Kill", reasoning };
   }
 
-  // Kill: spent >$50, zero conversions, medium+ confidence
-  if (metrics.spend > 50 && metrics.purchases === 0) {
-    const ctrCi = kpis.find((k) => k.benchmark.key === "ctr");
-    if (ctrCi && (ctrCi.ci.confidence === "medium" || ctrCi.ci.confidence === "high")) {
-      reasoning.push(
-        `$${metrics.spend.toFixed(2)} spent with 0 purchases at ${ctrCi.ci.confidence} confidence`
-      );
-      return { action: "Kill", reasoning };
-    }
+  // Kill: spent >2x CPA target with zero conversions and 50+ link clicks
+  const cpaTarget = getCpaTarget(frontEndPrice);
+  const zeroConvSpendThreshold = cpaTarget * 2;
+  if (metrics.spend > zeroConvSpendThreshold && metrics.purchases === 0 && metrics.linkClicks >= 50) {
+    reasoning.push(
+      `$${metrics.spend.toFixed(2)} spent (>${Math.round(zeroConvSpendThreshold)}) with 0 purchases across ${metrics.linkClicks} link clicks`
+    );
+    return { action: "Kill", reasoning };
   }
 
   // Scale: 4+ KPIs confidently passing, no hard metric failing

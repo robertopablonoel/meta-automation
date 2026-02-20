@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useMemo, useCallback } from "react";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useCampaignInsights } from "@/hooks/use-campaign-insights";
 import { useAdSetInsights } from "@/hooks/use-adset-insights";
 import { useCampaignAds } from "@/hooks/use-campaign-ads";
@@ -11,7 +11,10 @@ import { CampaignSummaryCards } from "@/components/campaign-summary-cards";
 import { AdSetTable } from "@/components/adset-table";
 import { WinnersSection } from "@/components/winners-section";
 import { KpiCell } from "@/components/kpi-cell";
+import { TrendsTab } from "@/components/trends-tab";
+import { DailyLogTab } from "@/components/daily-log-tab";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { computeMetrics } from "@/lib/metrics";
 import { evaluateKpis } from "@/lib/recommendations";
@@ -19,13 +22,32 @@ import { getRecommendation } from "@/lib/recommendations";
 import { softBenchmarks, hardBenchmarks } from "@/lib/benchmarks";
 import { parseAdName } from "@/lib/meta-fields";
 import { classifyAd } from "@/lib/winners";
-import type { AdSetRow, ComputedMetrics, WinnerAd } from "@/lib/types";
+import type { AdSetRow, AdActionSummary, ComputedMetrics, WinnerAd } from "@/lib/types";
 
-const FRONT_END_PRICE = parseFloat(process.env.NEXT_PUBLIC_FRONT_END_PRICE || "29.99");
+const FRONT_END_PRICE = parseFloat(process.env.NEXT_PUBLIC_FRONT_END_PRICE || "69.95");
 
 export default function CampaignOverview() {
   const { campaignId } = useParams<{ campaignId: string }>();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const { dateRange } = useDateRange();
+
+  const activeTab = searchParams.get("tab") || "overview";
+
+  const handleTabChange = useCallback(
+    (value: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value === "overview") {
+        params.delete("tab");
+      } else {
+        params.set("tab", value);
+      }
+      const qs = params.toString();
+      router.replace(`/${campaignId}${qs ? `?${qs}` : ""}`, { scroll: false });
+    },
+    [campaignId, router, searchParams]
+  );
+
   const { insights, isLoading: insightsLoading } = useCampaignInsights(
     campaignId,
     dateRange
@@ -90,24 +112,92 @@ export default function CampaignOverview() {
     return { winners: w, trending: t };
   }, [allAds]);
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-lg" />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Skeleton className="h-72 rounded-lg" />
-          <Skeleton className="h-72 rounded-lg" />
-        </div>
-        <Skeleton className="h-96 rounded-lg" />
-      </div>
-    );
-  }
+  return (
+    <Tabs value={activeTab} onValueChange={handleTabChange}>
+      <TabsList>
+        <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsTrigger value="trends">Trends</TabsTrigger>
+        <TabsTrigger value="daily-log">Daily Log</TabsTrigger>
+      </TabsList>
 
+      <TabsContent value="overview">
+        {isLoading ? (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-28 rounded-lg" />
+              ))}
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Skeleton className="h-72 rounded-lg" />
+              <Skeleton className="h-72 rounded-lg" />
+            </div>
+            <Skeleton className="h-96 rounded-lg" />
+          </div>
+        ) : (
+          <OverviewContent
+            campaignId={campaignId}
+            insights={insights}
+            adsets={adsets}
+            allAds={allAds}
+            adsLoading={adsLoading}
+            concepts={concepts}
+            winners={winners}
+            trending={trending}
+          />
+        )}
+      </TabsContent>
+
+      <TabsContent value="trends">
+        <TrendsTab campaignId={campaignId} />
+      </TabsContent>
+
+      <TabsContent value="daily-log">
+        <DailyLogTab campaignId={campaignId} />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function OverviewContent({
+  campaignId,
+  insights,
+  adsets,
+  allAds,
+  adsLoading,
+  concepts,
+  winners,
+  trending,
+}: {
+  campaignId: string;
+  insights: Record<string, unknown> | null;
+  adsets: Record<string, unknown>[];
+  allAds: Record<string, unknown>[];
+  adsLoading: boolean;
+  concepts: { name: string; display_name: string | null; schwartz_sophistication: string | null }[];
+  winners: WinnerAd[];
+  trending: WinnerAd[];
+}) {
   const campaignMetrics = insights ? computeMetrics(insights) : null;
+
+  // Compute per-ad recommendations grouped by adset
+  const adActionsByAdset = useMemo(() => {
+    const map = new Map<string, AdActionSummary>();
+    for (const ad of allAds) {
+      const adsetId = ad.adset_id as string;
+      if (!adsetId) continue;
+      const insightsData = (ad.insights as { data: Record<string, unknown>[] })?.data?.[0];
+      if (!insightsData) continue;
+      const m = computeMetrics(insightsData);
+      const rec = getRecommendation(m, FRONT_END_PRICE);
+      const summary = map.get(adsetId) || { kill: 0, watch: 0, scale: 0, starving: 0, total: 0 };
+      summary.total++;
+      const key = rec.action.toLowerCase() as keyof Omit<AdActionSummary, "total">;
+      summary[key]++;
+      map.set(adsetId, summary);
+    }
+    return map;
+  }, [allAds]);
 
   // Build ad set rows with concept metadata
   const conceptMap = new Map(concepts.map((c) => [c.name, c]));
@@ -140,6 +230,7 @@ export default function CampaignOverview() {
       status: adset.status as string,
       metrics,
       recommendation,
+      adActions: adActionsByAdset.get(adset.id as string),
       conceptName,
       conceptDisplayName,
       awarenessStage,

@@ -20,7 +20,7 @@ import { evaluateKpis, getRecommendation } from "@/lib/recommendations";
 import { softBenchmarks, hardBenchmarks } from "@/lib/benchmarks";
 import { parseAdName } from "@/lib/meta-fields";
 
-const FRONT_END_PRICE = parseFloat(process.env.NEXT_PUBLIC_FRONT_END_PRICE || "29.99");
+const FRONT_END_PRICE = parseFloat(process.env.NEXT_PUBLIC_FRONT_END_PRICE || "69.95");
 
 export default function AdDetail() {
   const { campaignId, adId } = useParams<{

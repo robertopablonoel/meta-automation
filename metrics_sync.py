@@ -90,6 +90,16 @@ def get_campaign_insights(campaign_id: str) -> dict | None:
     return items[0] if items else None
 
 
+def get_daily_insights(entity_id: str) -> list[dict]:
+    """Fetch daily breakdowns for the last 30 days."""
+    url = (f"{BASE_URL}/{entity_id}/insights"
+           f"?fields={INSIGHTS_FIELDS}"
+           f"&time_increment=1&date_preset=last_30d"
+           f"&access_token={META_ACCESS_TOKEN}")
+    data = meta_fetch(url)
+    return data.get("data", [])
+
+
 def get_adsets(campaign_id: str) -> list[dict]:
     url = f"{BASE_URL}/{campaign_id}/adsets?fields={ADSET_FIELDS},insights.fields({INSIGHTS_FIELDS}).date_preset(maximum)&limit=100&access_token={META_ACCESS_TOKEN}"
     return meta_fetch_all(url)
@@ -159,6 +169,18 @@ def sync(campaign_ids: list[str] | None = None):
                 "extra_fields": None,
             }, on_conflict="entity_type,entity_id").execute()
             total_campaigns += 1
+
+            # Daily snapshots (last 30 days)
+            daily_rows = get_daily_insights(cid)
+            for day in daily_rows:
+                sb.table("daily_snapshots").upsert({
+                    "entity_type": "campaign",
+                    "entity_id": cid,
+                    "campaign_id": cid,
+                    "date": day["date_start"],
+                    "insights": day,
+                }, on_conflict="entity_type,entity_id,date").execute()
+            logger.info(f"  {len(daily_rows)} daily snapshots")
 
             # Adsets
             adsets = get_adsets(cid)

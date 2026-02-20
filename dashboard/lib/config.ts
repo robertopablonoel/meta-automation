@@ -10,5 +10,5 @@ export const config = {
     anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
   },
-  frontEndPrice: parseFloat(process.env.FRONT_END_PRICE || "29.99"),
+  frontEndPrice: parseFloat(process.env.FRONT_END_PRICE || "69.95"),
 } as const;

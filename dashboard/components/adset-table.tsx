@@ -35,7 +35,7 @@ const stripeClass: Record<string, string> = {
   Starving: "row-stripe-starving",
 };
 
-type SortKey = "name" | "spend" | "impressions" | "cpm" | "ctr" | "cpc" | "cvr" | "cpa" | "roas" | "recommendation";
+type SortKey = "name" | "spend" | "impressions" | "cpm" | "ctr" | "hookRate" | "holdRate" | "cpc" | "cvr" | "cpa" | "roas" | "recommendation";
 
 interface Props {
   adsets: AdSetRow[];
@@ -62,8 +62,8 @@ export function AdSetTable({ adsets, campaignId }: Props) {
           bVal = order[b.recommendation.action];
           break;
         default:
-          aVal = (a.metrics as unknown as Record<string, number>)[sortKey] ?? 0;
-          bVal = (b.metrics as unknown as Record<string, number>)[sortKey] ?? 0;
+          aVal = (a.metrics as unknown as Record<string, number | null>)[sortKey] ?? 0;
+          bVal = (b.metrics as unknown as Record<string, number | null>)[sortKey] ?? 0;
       }
 
       if (aVal < bVal) return sortAsc ? -1 : 1;
@@ -102,6 +102,8 @@ export function AdSetTable({ adsets, campaignId }: Props) {
             <SortHeader label="Impr." sKey="impressions" />
             <SortHeader label="CPM" sKey="cpm" />
             <SortHeader label="CTR" sKey="ctr" />
+            <SortHeader label="Hook" sKey="hookRate" />
+            <SortHeader label="Hold" sKey="holdRate" />
             <SortHeader label="CPC" sKey="cpc" />
             <SortHeader label="CVR" sKey="cvr" />
             <SortHeader label="CPA" sKey="cpa" />
@@ -116,10 +118,10 @@ export function AdSetTable({ adsets, campaignId }: Props) {
                 i % 2 === 0 ? "" : "bg-muted/20"
               } hover:bg-muted/40 transition-colors`}
             >
-              <TableCell className="max-w-[200px]">
+              <TableCell className="max-w-[250px]">
                 <Link
                   href={`/${campaignId}/adsets/${adset.id}`}
-                  className="hover:underline font-medium text-sm"
+                  className="hover:underline font-medium text-sm block truncate"
                 >
                   {adset.conceptDisplayName || adset.name}
                 </Link>
@@ -150,6 +152,12 @@ export function AdSetTable({ adsets, campaignId }: Props) {
               <TableCell className="tabular-nums text-sm">{formatNumber(adset.metrics.impressions)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("cpm", adset.metrics.cpm)}`}>{formatCurrency(adset.metrics.cpm)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("ctr", adset.metrics.ctr)}`}>{formatPercent(adset.metrics.ctr)}</TableCell>
+              <TableCell className={`tabular-nums text-sm font-medium ${adset.metrics.hookRate != null ? getMetricColor("hookRate", adset.metrics.hookRate) : ""}`}>
+                {adset.metrics.hookRate != null ? formatPercent(adset.metrics.hookRate) : "-"}
+              </TableCell>
+              <TableCell className={`tabular-nums text-sm font-medium ${adset.metrics.holdRate != null ? getMetricColor("holdRate", adset.metrics.holdRate) : ""}`}>
+                {adset.metrics.holdRate != null ? formatPercent(adset.metrics.holdRate) : "-"}
+              </TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("cpc", adset.metrics.cpc)}`}>{formatCurrency(adset.metrics.cpc)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("cvr", adset.metrics.cvr)}`}>{formatPercent(adset.metrics.cvr)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${adset.metrics.cpa > 0 ? getMetricColor("cpa", adset.metrics.cpa) : ""}`}>
@@ -164,7 +172,7 @@ export function AdSetTable({ adsets, campaignId }: Props) {
           ))}
           {sorted.length === 0 && (
             <TableRow>
-              <TableCell colSpan={11} className="text-center text-muted-foreground py-12">
+              <TableCell colSpan={13} className="text-center text-muted-foreground py-12">
                 <div className="space-y-2">
                   <p className="text-sm font-medium">No ad sets found</p>
                   <p className="text-xs">Try selecting a different date range or campaign</p>

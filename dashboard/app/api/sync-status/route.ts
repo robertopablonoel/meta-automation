@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
-import { spawn } from "child_process";
-import path from "path";
+import { exec } from "child_process";
 
 export async function GET() {
   try {
@@ -37,19 +36,13 @@ export async function GET() {
 
 export async function POST() {
   try {
-    // Run metrics_sync.py as a detached child process
-    const projectRoot = path.resolve(process.cwd(), "..");
-    const python = path.join(projectRoot, "venv", "bin", "python");
-    const script = path.join(projectRoot, "metrics_sync.py");
-
-    const child = spawn(python, [script], {
-      cwd: projectRoot,
-      detached: true,
-      stdio: "ignore",
+    // Fire-and-forget: run metrics_sync.py in background
+    const cmd = "cd .. && venv/bin/python metrics_sync.py";
+    exec(cmd, (err, _stdout, stderr) => {
+      if (err) console.error("metrics_sync error:", stderr);
     });
-    child.unref();
 
-    return NextResponse.json({ data: { started: true, pid: child.pid } });
+    return NextResponse.json({ data: { started: true } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });

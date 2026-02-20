@@ -1,0 +1,9 @@
+.env
+.env.swp
+.DS_Store
+__pycache__/
+*.pyc
+output/
+input_images/
+.claude/
+venv/

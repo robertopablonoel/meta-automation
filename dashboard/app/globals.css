@@ -124,3 +124,23 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Tabular nums for metric alignment */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Table row recommendation stripe */
+.row-stripe-kill {
+  border-left: 3px solid oklch(0.637 0.237 25.331);
+}
+.row-stripe-watch {
+  border-left: 3px solid oklch(0.795 0.184 86.047);
+}
+.row-stripe-scale {
+  border-left: 3px solid oklch(0.723 0.191 149.579);
+}
+.row-stripe-starving {
+  border-left: 3px solid oklch(0.708 0 0);
+}
+

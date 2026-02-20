@@ -39,6 +39,26 @@ function isBenchmarkPassing(
 
   // "between"
   const [low, high] = target as [number, number];
+
+  if (benchmark.lowerIsBetter) {
+    // e.g. CPM $40-$50: below range is good, above is bad
+    return {
+      passing: value <= high,
+      confidentlyPassing: ci.upper <= high,
+      confidentlyFailing: ci.lower > high,
+    };
+  }
+
+  if (benchmark.lowerIsBetter === false) {
+    // e.g. CVR 3-5%: above range is fine, below is bad
+    return {
+      passing: value >= low,
+      confidentlyPassing: ci.lower >= low,
+      confidentlyFailing: ci.upper < low,
+    };
+  }
+
+  // Strict between (no preference)
   return {
     passing: value >= low && value <= high,
     confidentlyPassing: ci.lower >= low && ci.upper <= high,

@@ -12,12 +12,17 @@ export function KpiCell({ kpi }: { kpi: KpiResult }) {
 
   const perf = getPerformanceLevel(value, benchmark, ci);
 
-  // Value color based on pass/fail
+  // Value color — works in both light and dark
   let valueColor = "text-foreground";
-  if (kpi.confidentlyPassing) valueColor = "text-green-600";
-  else if (kpi.confidentlyFailing) valueColor = "text-red-600";
-  else if (kpi.passing) valueColor = "text-green-500/80";
-  else valueColor = "text-red-500/80";
+  if (kpi.confidentlyPassing) valueColor = "text-green-600 dark:text-green-400";
+  else if (kpi.confidentlyFailing) valueColor = "text-red-600 dark:text-red-400";
+  else if (kpi.passing) valueColor = "text-green-600/70 dark:text-green-400/70";
+  else valueColor = "text-red-600/70 dark:text-red-400/70";
+
+  // Background wash — very subtle in dark mode
+  let bgWash = "bg-muted/30";
+  if (perf.color === "good") bgWash = "bg-green-50 dark:bg-green-950/40";
+  else if (perf.color === "bad") bgWash = "bg-red-50 dark:bg-red-950/40";
 
   // Target display
   const target = Array.isArray(benchmark.target)
@@ -31,19 +36,18 @@ export function KpiCell({ kpi }: { kpi: KpiResult }) {
       )}`;
 
   return (
-    <div className="space-y-1">
+    <div className={`rounded-lg p-3 space-y-1.5 ${bgWash} transition-colors`}>
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">{benchmark.label}</span>
+        <span className="text-xs font-medium text-muted-foreground">{benchmark.label}</span>
         <PerformanceBadge label={perf.label} color={perf.color} />
       </div>
-      <div className={`text-lg font-semibold ${valueColor}`}>{formatted}</div>
-      {ci.confidence !== "none" && (
-        <div className="text-xs text-muted-foreground">
-          CI: {ciLower} - {ciUpper}
-        </div>
-      )}
-      <div className="text-xs text-muted-foreground">Target: {target}</div>
-      {/* Benchmark bar */}
+      <div className={`text-2xl font-bold tabular-nums ${valueColor}`}>{formatted}</div>
+      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <span>Target: {target}</span>
+        {ci.confidence !== "none" && (
+          <span>CI: {ciLower} - {ciUpper}</span>
+        )}
+      </div>
       <BenchmarkBar kpi={kpi} />
     </div>
   );
@@ -52,7 +56,6 @@ export function KpiCell({ kpi }: { kpi: KpiResult }) {
 function BenchmarkBar({ kpi }: { kpi: KpiResult }) {
   const { benchmark, value, ci } = kpi;
 
-  // Determine bar range based on benchmark type
   let barMax: number;
   let targetPos: number | [number, number];
 
@@ -69,45 +72,42 @@ function BenchmarkBar({ kpi }: { kpi: KpiResult }) {
   const ciUpperPos = Math.min(1, Math.max(0, ci.upper / barMax));
 
   const bgColor = kpi.confidentlyPassing
-    ? "bg-green-200"
+    ? "bg-green-200 dark:bg-green-900/50"
     : kpi.confidentlyFailing
-    ? "bg-red-200"
-    : "bg-gray-200";
+    ? "bg-red-200 dark:bg-red-900/50"
+    : "bg-gray-200 dark:bg-gray-700";
 
   return (
-    <div className={`relative h-2 rounded-full ${bgColor} overflow-hidden`}>
-      {/* CI range */}
+    <div className={`relative h-2.5 rounded-full ${bgColor} overflow-hidden`}>
       {ci.confidence !== "none" && (
         <div
-          className="absolute h-full bg-blue-300/50 rounded-full"
+          className="absolute h-full bg-blue-300/50 dark:bg-blue-500/30 rounded-full"
           style={{
             left: `${ciLowerPos * 100}%`,
             width: `${(ciUpperPos - ciLowerPos) * 100}%`,
           }}
         />
       )}
-      {/* Target line(s) */}
       {Array.isArray(targetPos) ? (
         <>
           <div
-            className="absolute h-full w-px bg-gray-500"
+            className="absolute h-full w-0.5 bg-gray-500/70 dark:bg-gray-400/70"
             style={{ left: `${targetPos[0] * 100}%` }}
           />
           <div
-            className="absolute h-full w-px bg-gray-500"
+            className="absolute h-full w-0.5 bg-gray-500/70 dark:bg-gray-400/70"
             style={{ left: `${targetPos[1] * 100}%` }}
           />
         </>
       ) : (
         <div
-          className="absolute h-full w-px bg-gray-500"
+          className="absolute h-full w-0.5 bg-gray-500/70 dark:bg-gray-400/70"
           style={{ left: `${(targetPos as number) * 100}%` }}
         />
       )}
-      {/* Value dot */}
       <div
-        className="absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-foreground"
-        style={{ left: `calc(${valuePos * 100}% - 4px)` }}
+        className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-foreground shadow-sm"
+        style={{ left: `calc(${valuePos * 100}% - 5px)` }}
       />
     </div>
   );

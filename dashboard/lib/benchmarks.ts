@@ -99,9 +99,9 @@ export function getMetricColor(key: string, value: number): string {
   // ROAS: not in benchmarks but higher is better
   if (key === "roas") {
     if (value <= 0) return "";
-    if (value >= 2) return "text-green-600";
-    if (value >= 1) return "text-yellow-600";
-    return "text-red-500";
+    if (value >= 2) return "text-green-600 dark:text-green-400";
+    if (value >= 1) return "text-yellow-600 dark:text-yellow-400";
+    return "text-red-500 dark:text-red-400";
   }
 
   const benchmark = allBenchmarks.find((b) => b.key === key);
@@ -114,30 +114,30 @@ export function getMetricColor(key: string, value: number): string {
 
   if (benchmark.comparison === "less_than") {
     const t = target as number;
-    if (value <= t) return "text-green-600";
-    if (value <= t * 1.5) return "text-yellow-600";
-    return "text-red-500";
+    if (value <= t) return "text-green-600 dark:text-green-400";
+    if (value <= t * 1.5) return "text-yellow-600 dark:text-yellow-400";
+    return "text-red-500 dark:text-red-400";
   }
 
   if (benchmark.comparison === "greater_than") {
     const t = target as number;
-    if (value >= t) return "text-green-600";
-    if (value >= t * 0.5) return "text-yellow-600";
-    return "text-red-500";
+    if (value >= t) return "text-green-600 dark:text-green-400";
+    if (value >= t * 0.5) return "text-yellow-600 dark:text-yellow-400";
+    return "text-red-500 dark:text-red-400";
   }
 
   // "between" [lo, hi]
   const [lo, hi] = target as [number, number];
-  if (value >= lo && value <= hi) return "text-green-600";
+  if (value >= lo && value <= hi) return "text-green-600 dark:text-green-400";
   if (benchmark.lowerIsBetter) {
     // Below range is good (e.g. CPM)
-    if (value < lo) return "text-green-600";
-    if (value <= hi * 1.3) return "text-yellow-600";
-    return "text-red-500";
+    if (value < lo) return "text-green-600 dark:text-green-400";
+    if (value <= hi * 1.3) return "text-yellow-600 dark:text-yellow-400";
+    return "text-red-500 dark:text-red-400";
   } else {
     // Above range is good (e.g. CVR)
-    if (value > hi) return "text-green-600";
-    if (value >= lo * 0.5) return "text-yellow-600";
-    return "text-red-500";
+    if (value > hi) return "text-green-600 dark:text-green-400";
+    if (value >= lo * 0.5) return "text-yellow-600 dark:text-yellow-400";
+    return "text-red-500 dark:text-red-400";
   }
 }

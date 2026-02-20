@@ -38,12 +38,16 @@ export default function CampaignOverview() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-24" />
+            <Skeleton key={i} className="h-28 rounded-lg" />
           ))}
         </div>
-        <Skeleton className="h-64" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-72 rounded-lg" />
+          <Skeleton className="h-72 rounded-lg" />
+        </div>
+        <Skeleton className="h-96 rounded-lg" />
       </div>
     );
   }
@@ -109,11 +113,12 @@ export default function CampaignOverview() {
       {/* KPI breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Soft Metrics (Ad-Side)</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Ad Performance</CardTitle>
+            <p className="text-xs text-muted-foreground">How your ads are performing at capturing attention</p>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               {softKpis.map((kpi) => (
                 <KpiCell key={kpi.benchmark.key} kpi={kpi} />
               ))}
@@ -121,11 +126,12 @@ export default function CampaignOverview() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Hard Metrics (Funnel-Side)</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Conversion Funnel</CardTitle>
+            <p className="text-xs text-muted-foreground">How clicks are converting to revenue</p>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               {hardKpis.map((kpi) => (
                 <KpiCell key={kpi.benchmark.key} kpi={kpi} />
               ))}

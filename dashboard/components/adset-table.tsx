@@ -20,15 +20,20 @@ import { formatCurrency, formatPercent, formatNumber } from "@/lib/utils";
 import { getMetricColor } from "@/lib/benchmarks";
 import type { AdSetRow } from "@/lib/types";
 
-// Extract just the stage number(s) from text like "Stage 4-5 (Enhanced...)" → "4-5"
 function extractStageNumbers(text: string): string {
   const match = text.match(/Stage\s+([\d][\d\s,\-]*[\d]?)/i);
   if (match) return match[1].trim();
-  // Fallback: find any leading numbers
   const numMatch = text.match(/^[\d][\d\s,\-]*/);
   if (numMatch) return numMatch[0].trim();
   return text.slice(0, 10);
 }
+
+const stripeClass: Record<string, string> = {
+  Kill: "row-stripe-kill",
+  Watch: "row-stripe-watch",
+  Scale: "row-stripe-scale",
+  Starving: "row-stripe-starving",
+};
 
 type SortKey = "name" | "spend" | "impressions" | "cpm" | "ctr" | "cpc" | "cvr" | "cpa" | "roas" | "recommendation";
 
@@ -78,7 +83,7 @@ export function AdSetTable({ adsets, campaignId }: Props) {
 
   const SortHeader = ({ label, sKey }: { label: string; sKey: SortKey }) => (
     <TableHead
-      className="cursor-pointer hover:text-foreground select-none"
+      className="cursor-pointer hover:text-foreground select-none text-xs whitespace-nowrap"
       onClick={() => handleSort(sKey)}
     >
       {label} {sortKey === sKey ? (sortAsc ? "↑" : "↓") : ""}
@@ -86,79 +91,89 @@ export function AdSetTable({ adsets, campaignId }: Props) {
   );
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <SortHeader label="Ad Set" sKey="name" />
-          <TableHead>Awareness</TableHead>
-          <SortHeader label="Action" sKey="recommendation" />
-          <SortHeader label="Spend" sKey="spend" />
-          <SortHeader label="Impressions" sKey="impressions" />
-          <SortHeader label="CPM" sKey="cpm" />
-          <SortHeader label="CTR" sKey="ctr" />
-          <SortHeader label="CPC" sKey="cpc" />
-          <SortHeader label="CVR" sKey="cvr" />
-          <SortHeader label="CPA" sKey="cpa" />
-          <SortHeader label="ROAS" sKey="roas" />
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {sorted.map((adset) => (
-          <TableRow key={adset.id}>
-            <TableCell>
-              <Link
-                href={`/${campaignId}/adsets/${adset.id}`}
-                className="hover:underline font-medium"
-              >
-                {adset.conceptDisplayName || adset.name}
-              </Link>
-              {adset.conceptDisplayName && (
-                <div className="text-xs text-muted-foreground">{adset.name}</div>
-              )}
-            </TableCell>
-            <TableCell>
-              {adset.awarenessStage ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="text-xs font-medium cursor-help underline decoration-dotted">
-                      {extractStageNumbers(adset.awarenessStage)}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-sm text-xs">
-                    {adset.awarenessStage}
-                  </TooltipContent>
-                </Tooltip>
-              ) : (
-                <span className="text-xs text-muted-foreground">-</span>
-              )}
-            </TableCell>
-            <TableCell>
-              <RecommendationBadge recommendation={adset.recommendation} />
-            </TableCell>
-            <TableCell>{formatCurrency(adset.metrics.spend)}</TableCell>
-            <TableCell>{formatNumber(adset.metrics.impressions)}</TableCell>
-            <TableCell className={getMetricColor("cpm", adset.metrics.cpm)}>{formatCurrency(adset.metrics.cpm)}</TableCell>
-            <TableCell className={getMetricColor("ctr", adset.metrics.ctr)}>{formatPercent(adset.metrics.ctr)}</TableCell>
-            <TableCell className={getMetricColor("cpc", adset.metrics.cpc)}>{formatCurrency(adset.metrics.cpc)}</TableCell>
-            <TableCell className={getMetricColor("cvr", adset.metrics.cvr)}>{formatPercent(adset.metrics.cvr)}</TableCell>
-            <TableCell className={adset.metrics.cpa > 0 ? getMetricColor("cpa", adset.metrics.cpa) : ""}>
-              {adset.metrics.cpa > 0 ? formatCurrency(adset.metrics.cpa) : "-"}
-            </TableCell>
-            <TableCell className={adset.metrics.roas > 0 ? getMetricColor("roas", adset.metrics.roas) : ""}>
-              {adset.metrics.roas > 0
-                ? `${adset.metrics.roas.toFixed(2)}x`
-                : "-"}
-            </TableCell>
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/40">
+            <SortHeader label="Ad Set" sKey="name" />
+            <TableHead className="text-xs">Stage</TableHead>
+            <SortHeader label="Action" sKey="recommendation" />
+            <SortHeader label="Spend" sKey="spend" />
+            <SortHeader label="Impr." sKey="impressions" />
+            <SortHeader label="CPM" sKey="cpm" />
+            <SortHeader label="CTR" sKey="ctr" />
+            <SortHeader label="CPC" sKey="cpc" />
+            <SortHeader label="CVR" sKey="cvr" />
+            <SortHeader label="CPA" sKey="cpa" />
+            <SortHeader label="ROAS" sKey="roas" />
           </TableRow>
-        ))}
-        {sorted.length === 0 && (
-          <TableRow>
-            <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
-              No ad sets found
-            </TableCell>
-          </TableRow>
-        )}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {sorted.map((adset, i) => (
+            <TableRow
+              key={adset.id}
+              className={`${stripeClass[adset.recommendation.action] || ""} ${
+                i % 2 === 0 ? "" : "bg-muted/20"
+              } hover:bg-muted/40 transition-colors`}
+            >
+              <TableCell className="max-w-[200px]">
+                <Link
+                  href={`/${campaignId}/adsets/${adset.id}`}
+                  className="hover:underline font-medium text-sm"
+                >
+                  {adset.conceptDisplayName || adset.name}
+                </Link>
+                {adset.conceptDisplayName && (
+                  <div className="text-[11px] text-muted-foreground truncate">{adset.name}</div>
+                )}
+              </TableCell>
+              <TableCell>
+                {adset.awarenessStage ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-xs font-medium cursor-help underline decoration-dotted decoration-muted-foreground">
+                        {extractStageNumbers(adset.awarenessStage)}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-sm text-xs">
+                      {adset.awarenessStage}
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <span className="text-xs text-muted-foreground">-</span>
+                )}
+              </TableCell>
+              <TableCell>
+                <RecommendationBadge recommendation={adset.recommendation} />
+              </TableCell>
+              <TableCell className="tabular-nums text-sm">{formatCurrency(adset.metrics.spend)}</TableCell>
+              <TableCell className="tabular-nums text-sm">{formatNumber(adset.metrics.impressions)}</TableCell>
+              <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("cpm", adset.metrics.cpm)}`}>{formatCurrency(adset.metrics.cpm)}</TableCell>
+              <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("ctr", adset.metrics.ctr)}`}>{formatPercent(adset.metrics.ctr)}</TableCell>
+              <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("cpc", adset.metrics.cpc)}`}>{formatCurrency(adset.metrics.cpc)}</TableCell>
+              <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("cvr", adset.metrics.cvr)}`}>{formatPercent(adset.metrics.cvr)}</TableCell>
+              <TableCell className={`tabular-nums text-sm font-medium ${adset.metrics.cpa > 0 ? getMetricColor("cpa", adset.metrics.cpa) : ""}`}>
+                {adset.metrics.cpa > 0 ? formatCurrency(adset.metrics.cpa) : "-"}
+              </TableCell>
+              <TableCell className={`tabular-nums text-sm font-medium ${adset.metrics.roas > 0 ? getMetricColor("roas", adset.metrics.roas) : ""}`}>
+                {adset.metrics.roas > 0
+                  ? `${adset.metrics.roas.toFixed(2)}x`
+                  : "-"}
+              </TableCell>
+            </TableRow>
+          ))}
+          {sorted.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={11} className="text-center text-muted-foreground py-12">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">No ad sets found</p>
+                  <p className="text-xs">Try selecting a different date range or campaign</p>
+                </div>
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
   );
 }

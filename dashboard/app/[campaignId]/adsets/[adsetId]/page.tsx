@@ -8,7 +8,7 @@ import { useDateRange } from "../../layout";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { AdTable } from "@/components/ad-table";
 import { KpiCell } from "@/components/kpi-cell";
-import { RecommendationBadge } from "@/components/recommendation-badge";
+import { RecommendationBanner } from "@/components/recommendation-banner";
 import { ConceptCard } from "@/components/concept-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -94,9 +94,13 @@ export default function AdSetDetail() {
   if (adsLoading) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-6 w-64" />
-        <Skeleton className="h-48" />
-        <Skeleton className="h-64" />
+        <Skeleton className="h-6 w-64 rounded" />
+        <Skeleton className="h-20 rounded-lg" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-72 rounded-lg" />
+          <Skeleton className="h-72 rounded-lg" />
+        </div>
+        <Skeleton className="h-96 rounded-lg" />
       </div>
     );
   }
@@ -112,12 +116,12 @@ export default function AdSetDetail() {
       />
 
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <h2 className="text-2xl font-bold">{adsetName}</h2>
-        {adsetRecommendation && (
-          <RecommendationBadge recommendation={adsetRecommendation} />
-        )}
-      </div>
+      <h2 className="text-2xl font-bold tracking-tight">{adsetName}</h2>
+
+      {/* Recommendation banner */}
+      {adsetRecommendation && (
+        <RecommendationBanner recommendation={adsetRecommendation} />
+      )}
 
       {/* Concept card */}
       {matchedConcept && <ConceptCard concept={matchedConcept} />}
@@ -125,11 +129,12 @@ export default function AdSetDetail() {
       {/* KPI breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Soft Metrics</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Ad Performance</CardTitle>
+            <p className="text-xs text-muted-foreground">How this ad set captures attention</p>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               {softKpis.map((kpi) => (
                 <KpiCell key={kpi.benchmark.key} kpi={kpi} />
               ))}
@@ -137,11 +142,12 @@ export default function AdSetDetail() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Hard Metrics</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Conversion Funnel</CardTitle>
+            <p className="text-xs text-muted-foreground">How clicks convert to revenue</p>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               {hardKpis.map((kpi) => (
                 <KpiCell key={kpi.benchmark.key} kpi={kpi} />
               ))}

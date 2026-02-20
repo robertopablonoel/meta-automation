@@ -51,9 +51,9 @@ export function getPerformanceLevel(
 }
 
 const colorStyles: Record<PerformanceColor, string> = {
-  good: "bg-green-100 text-green-700",
-  bad: "bg-red-100 text-red-700",
-  neutral: "bg-gray-100 text-gray-500",
+  good: "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300",
+  bad: "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300",
+  neutral: "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
 };
 
 interface Props {

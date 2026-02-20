@@ -62,7 +62,6 @@ export function AdMetadataPanel({
               <MetadataField
                 label="Awareness Level"
                 value={description.target_awareness_level}
-                badge
               />
             </div>
             {description.transcript_summary && (

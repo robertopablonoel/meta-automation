@@ -1,5 +1,9 @@
 import type { MetaAction } from "./types";
 
+// Custom conversion IDs for Spicy Cubes / Pineapple
+const CUSTOM_PURCHASE_ID = "866343756407498"; // "Purchase | All Pineapple"
+const CUSTOM_ATC_ID = "882491937726061"; // "ATC | Pineapple"
+
 // Fields requested from Meta Insights API
 export const INSIGHTS_FIELDS = [
   "impressions",
@@ -11,6 +15,7 @@ export const INSIGHTS_FIELDS = [
   "reach",
   "frequency",
   "actions",
+  "action_values",
   "cost_per_action_type",
   "video_avg_time_watched_actions",
   "video_p50_watched_actions",
@@ -31,11 +36,16 @@ export function extractAction(
   return action ? parseFloat(action.value) : 0;
 }
 
-// Common action types
+// Common action types — use custom conversions for purchase/ATC
 export const ACTION_TYPES = {
   linkClick: "link_click",
-  purchase: "offsite_conversion.fb_pixel_purchase",
-  addToCart: "offsite_conversion.fb_pixel_add_to_cart",
+  // Custom conversion: "Purchase | All Pineapple"
+  purchase: `offsite_conversion.custom.${CUSTOM_PURCHASE_ID}`,
+  // Custom conversion: "ATC | Pineapple"
+  addToCart: `offsite_conversion.custom.${CUSTOM_ATC_ID}`,
+  // Fallback standard pixel events
+  pixelPurchase: "offsite_conversion.fb_pixel_purchase",
+  pixelAddToCart: "offsite_conversion.fb_pixel_add_to_cart",
   landing_page_view: "landing_page_view",
   video3sView: "video_view",
 } as const;

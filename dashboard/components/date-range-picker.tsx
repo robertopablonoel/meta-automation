@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import type { DateRange } from "@/lib/types";
 
 interface Props {
-  value: DateRange;
+  value: DateRange | undefined;
   onChange: (range: DateRange) => void;
 }
 
@@ -18,24 +18,28 @@ const presets = [
 ];
 
 function formatDate(d: Date): string {
-  return d.toISOString().split("T")[0];
+  // Use local date to avoid timezone issues
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function getRange(days: number): DateRange {
   const now = new Date();
+  const today = formatDate(now);
   if (days === 0) {
-    const today = formatDate(now);
     return { since: today, until: today };
   }
   if (days === -1) {
-    // Lifetime = last 365 days
+    // Lifetime: go back 36 months (Meta's max is 37), include today
     const since = new Date(now);
-    since.setDate(since.getDate() - 365);
-    return { since: formatDate(since), until: formatDate(now) };
+    since.setMonth(since.getMonth() - 36);
+    return { since: formatDate(since), until: today };
   }
   const since = new Date(now);
   since.setDate(since.getDate() - days);
-  return { since: formatDate(since), until: formatDate(now) };
+  return { since: formatDate(since), until: today };
 }
 
 export function DateRangePicker({ value, onChange }: Props) {
@@ -59,20 +63,20 @@ export function DateRangePicker({ value, onChange }: Props) {
       <div className="flex items-center gap-1 ml-2">
         <input
           type="date"
-          value={value.since}
+          value={value?.since ?? ""}
           onChange={(e) => {
             setActive("");
-            onChange({ ...value, since: e.target.value });
+            onChange({ since: e.target.value, until: value?.until ?? formatDate(new Date()) });
           }}
           className="text-xs border rounded px-2 py-1"
         />
         <span className="text-xs text-muted-foreground">to</span>
         <input
           type="date"
-          value={value.until}
+          value={value?.until ?? ""}
           onChange={(e) => {
             setActive("");
-            onChange({ ...value, until: e.target.value });
+            onChange({ since: value?.since ?? "2020-01-01", until: e.target.value });
           }}
           className="text-xs border rounded px-2 py-1"
         />

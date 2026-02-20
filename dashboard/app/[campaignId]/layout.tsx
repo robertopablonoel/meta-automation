@@ -7,7 +7,7 @@ import type { DateRange } from "@/lib/types";
 
 interface DateRangeContextValue {
   dateRange: DateRange | undefined;
-  setDateRange: (range: DateRange) => void;
+  setDateRange: (range: DateRange | undefined) => void;
 }
 
 export const DateRangeContext = createContext<DateRangeContextValue>({
@@ -24,7 +24,15 @@ export default function CampaignLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  // Default to Lifetime: 36 months back through today
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
+    const now = new Date();
+    const since = new Date(now);
+    since.setMonth(since.getMonth() - 36);
+    const fmt = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return { since: fmt(since), until: fmt(now) };
+  });
 
   return (
     <DateRangeContext.Provider value={{ dateRange, setDateRange }}>
@@ -36,14 +44,7 @@ export default function CampaignLayout({
               <CampaignSelector />
             </div>
             <DateRangePicker
-              value={
-                dateRange || {
-                  since: new Date(Date.now() - 365 * 86400000)
-                    .toISOString()
-                    .split("T")[0],
-                  until: new Date().toISOString().split("T")[0],
-                }
-              }
+              value={dateRange}
               onChange={setDateRange}
             />
           </div>

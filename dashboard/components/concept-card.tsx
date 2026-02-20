@@ -30,13 +30,13 @@ export function ConceptCard({ concept }: { concept: Concept }) {
           </div>
         )}
         <Separator />
-        <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-3">
           {concept.schwartz_sophistication && (
             <div>
               <h4 className="text-xs font-medium text-muted-foreground mb-1">
                 Awareness Stage
               </h4>
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-xs whitespace-normal text-left">
                 {concept.schwartz_sophistication}
               </Badge>
             </div>
@@ -46,7 +46,7 @@ export function ConceptCard({ concept }: { concept: Concept }) {
               <h4 className="text-xs font-medium text-muted-foreground mb-1">
                 Belief Mapping
               </h4>
-              <p className="text-xs">{concept.belief_mapping}</p>
+              <p className="text-xs leading-relaxed">{concept.belief_mapping}</p>
             </div>
           )}
         </div>

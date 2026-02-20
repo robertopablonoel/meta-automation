@@ -13,9 +13,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { RecommendationBadge } from "./recommendation-badge";
 import { formatCurrency, formatPercent, formatNumber } from "@/lib/utils";
+import { getMetricColor } from "@/lib/benchmarks";
 import type { AdRow } from "@/lib/types";
 
-type SortKey = "name" | "spend" | "impressions" | "ctr" | "cpc" | "cvr" | "cpa" | "roas";
+type SortKey = "name" | "spend" | "impressions" | "cpm" | "ctr" | "cpc" | "cvr" | "cpa" | "roas";
 
 interface Props {
   ads: AdRow[];
@@ -71,6 +72,7 @@ export function AdTable({ ads, campaignId }: Props) {
           <TableHead>Type</TableHead>
           <SortHeader label="Spend" sKey="spend" />
           <SortHeader label="Impressions" sKey="impressions" />
+          <SortHeader label="CPM" sKey="cpm" />
           <SortHeader label="CTR" sKey="ctr" />
           <SortHeader label="CPC" sKey="cpc" />
           <SortHeader label="CVR" sKey="cvr" />
@@ -106,20 +108,21 @@ export function AdTable({ ads, campaignId }: Props) {
             </TableCell>
             <TableCell>{formatCurrency(ad.metrics.spend)}</TableCell>
             <TableCell>{formatNumber(ad.metrics.impressions)}</TableCell>
-            <TableCell>{formatPercent(ad.metrics.ctr)}</TableCell>
-            <TableCell>{formatCurrency(ad.metrics.cpc)}</TableCell>
-            <TableCell>{formatPercent(ad.metrics.cvr)}</TableCell>
-            <TableCell>
+            <TableCell className={getMetricColor("cpm", ad.metrics.cpm)}>{formatCurrency(ad.metrics.cpm)}</TableCell>
+            <TableCell className={getMetricColor("ctr", ad.metrics.ctr)}>{formatPercent(ad.metrics.ctr)}</TableCell>
+            <TableCell className={getMetricColor("cpc", ad.metrics.cpc)}>{formatCurrency(ad.metrics.cpc)}</TableCell>
+            <TableCell className={getMetricColor("cvr", ad.metrics.cvr)}>{formatPercent(ad.metrics.cvr)}</TableCell>
+            <TableCell className={ad.metrics.cpa > 0 ? getMetricColor("cpa", ad.metrics.cpa) : ""}>
               {ad.metrics.cpa > 0 ? formatCurrency(ad.metrics.cpa) : "-"}
             </TableCell>
-            <TableCell>
+            <TableCell className={ad.metrics.roas > 0 ? getMetricColor("roas", ad.metrics.roas) : ""}>
               {ad.metrics.roas > 0 ? `${ad.metrics.roas.toFixed(2)}x` : "-"}
             </TableCell>
           </TableRow>
         ))}
         {sorted.length === 0 && (
           <TableRow>
-            <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+            <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
               No ads found
             </TableCell>
           </TableRow>

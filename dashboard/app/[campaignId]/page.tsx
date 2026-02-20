@@ -66,10 +66,13 @@ export default function CampaignOverview() {
     let conceptName: string | undefined;
     let conceptDisplayName: string | undefined;
 
+    let awarenessStage: string | undefined;
+
     for (const [name, concept] of conceptMap) {
       if (adsetName.toLowerCase().includes(name.toLowerCase())) {
         conceptName = name;
         conceptDisplayName = concept.display_name || undefined;
+        awarenessStage = concept.schwartz_sophistication || undefined;
         break;
       }
     }
@@ -82,6 +85,7 @@ export default function CampaignOverview() {
       recommendation,
       conceptName,
       conceptDisplayName,
+      awarenessStage,
     };
   });
 

@@ -101,6 +101,7 @@ export interface Benchmark {
   format: "currency" | "percent" | "number";
   videoOnly?: boolean;
   dynamic?: boolean;
+  lowerIsBetter?: boolean; // For "between" benchmarks; inferred for less_than/greater_than
 }
 
 // ── KPI evaluation ──
@@ -191,6 +192,7 @@ export interface AdSetRow {
   recommendation: Recommendation;
   conceptName?: string;
   conceptDisplayName?: string;
+  awarenessStage?: string;
 }
 
 export interface AdRow {

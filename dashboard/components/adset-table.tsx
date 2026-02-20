@@ -10,11 +10,27 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { RecommendationBadge } from "./recommendation-badge";
 import { formatCurrency, formatPercent, formatNumber } from "@/lib/utils";
+import { getMetricColor } from "@/lib/benchmarks";
 import type { AdSetRow } from "@/lib/types";
 
-type SortKey = "name" | "spend" | "impressions" | "ctr" | "cpc" | "cvr" | "cpa" | "roas" | "recommendation";
+// Extract just the stage number(s) from text like "Stage 4-5 (Enhanced...)" → "4-5"
+function extractStageNumbers(text: string): string {
+  const match = text.match(/Stage\s+([\d][\d\s,\-]*[\d]?)/i);
+  if (match) return match[1].trim();
+  // Fallback: find any leading numbers
+  const numMatch = text.match(/^[\d][\d\s,\-]*/);
+  if (numMatch) return numMatch[0].trim();
+  return text.slice(0, 10);
+}
+
+type SortKey = "name" | "spend" | "impressions" | "cpm" | "ctr" | "cpc" | "cvr" | "cpa" | "roas" | "recommendation";
 
 interface Props {
   adsets: AdSetRow[];
@@ -74,9 +90,11 @@ export function AdSetTable({ adsets, campaignId }: Props) {
       <TableHeader>
         <TableRow>
           <SortHeader label="Ad Set" sKey="name" />
+          <TableHead>Awareness</TableHead>
           <SortHeader label="Action" sKey="recommendation" />
           <SortHeader label="Spend" sKey="spend" />
           <SortHeader label="Impressions" sKey="impressions" />
+          <SortHeader label="CPM" sKey="cpm" />
           <SortHeader label="CTR" sKey="ctr" />
           <SortHeader label="CPC" sKey="cpc" />
           <SortHeader label="CVR" sKey="cvr" />
@@ -99,17 +117,34 @@ export function AdSetTable({ adsets, campaignId }: Props) {
               )}
             </TableCell>
             <TableCell>
+              {adset.awarenessStage ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-xs font-medium cursor-help underline decoration-dotted">
+                      {extractStageNumbers(adset.awarenessStage)}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-sm text-xs">
+                    {adset.awarenessStage}
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <span className="text-xs text-muted-foreground">-</span>
+              )}
+            </TableCell>
+            <TableCell>
               <RecommendationBadge recommendation={adset.recommendation} />
             </TableCell>
             <TableCell>{formatCurrency(adset.metrics.spend)}</TableCell>
             <TableCell>{formatNumber(adset.metrics.impressions)}</TableCell>
-            <TableCell>{formatPercent(adset.metrics.ctr)}</TableCell>
-            <TableCell>{formatCurrency(adset.metrics.cpc)}</TableCell>
-            <TableCell>{formatPercent(adset.metrics.cvr)}</TableCell>
-            <TableCell>
+            <TableCell className={getMetricColor("cpm", adset.metrics.cpm)}>{formatCurrency(adset.metrics.cpm)}</TableCell>
+            <TableCell className={getMetricColor("ctr", adset.metrics.ctr)}>{formatPercent(adset.metrics.ctr)}</TableCell>
+            <TableCell className={getMetricColor("cpc", adset.metrics.cpc)}>{formatCurrency(adset.metrics.cpc)}</TableCell>
+            <TableCell className={getMetricColor("cvr", adset.metrics.cvr)}>{formatPercent(adset.metrics.cvr)}</TableCell>
+            <TableCell className={adset.metrics.cpa > 0 ? getMetricColor("cpa", adset.metrics.cpa) : ""}>
               {adset.metrics.cpa > 0 ? formatCurrency(adset.metrics.cpa) : "-"}
             </TableCell>
-            <TableCell>
+            <TableCell className={adset.metrics.roas > 0 ? getMetricColor("roas", adset.metrics.roas) : ""}>
               {adset.metrics.roas > 0
                 ? `${adset.metrics.roas.toFixed(2)}x`
                 : "-"}
@@ -118,7 +153,7 @@ export function AdSetTable({ adsets, campaignId }: Props) {
         ))}
         {sorted.length === 0 && (
           <TableRow>
-            <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+            <TableCell colSpan={11} className="text-center text-muted-foreground py-8">
               No ad sets found
             </TableCell>
           </TableRow>

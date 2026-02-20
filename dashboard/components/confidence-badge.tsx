@@ -1,26 +1,70 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import type { ConfidenceLevel } from "@/lib/types";
+import type { Benchmark, ConfidenceInterval } from "@/lib/types";
 
-const styles: Record<ConfidenceLevel, string> = {
-  none: "bg-gray-100 text-gray-500",
-  low: "bg-yellow-100 text-yellow-700",
-  medium: "bg-blue-100 text-blue-700",
-  high: "bg-green-100 text-green-700",
+type PerformanceLevel = "Low" | "On Target" | "High" | "No data";
+type PerformanceColor = "good" | "bad" | "neutral";
+
+function isLowerBetter(benchmark: Benchmark): boolean {
+  if (benchmark.lowerIsBetter !== undefined) return benchmark.lowerIsBetter;
+  return benchmark.comparison === "less_than";
+}
+
+export function getPerformanceLevel(
+  value: number,
+  benchmark: Benchmark,
+  ci: ConfidenceInterval
+): { label: PerformanceLevel; color: PerformanceColor } {
+  // Only show "No data" when the value is truly zero/meaningless
+  if (value === 0 && ci.confidence === "none") {
+    return { label: "No data", color: "neutral" };
+  }
+
+  const lowerBetter = isLowerBetter(benchmark);
+
+  if (benchmark.comparison === "between") {
+    const [lo, hi] = benchmark.target as [number, number];
+    if (value < lo) {
+      return { label: "Low", color: lowerBetter ? "good" : "bad" };
+    }
+    if (value > hi) {
+      return { label: "High", color: lowerBetter ? "bad" : "good" };
+    }
+    return { label: "On Target", color: "good" };
+  }
+
+  if (benchmark.comparison === "less_than") {
+    const t = benchmark.target as number;
+    if (value <= t) {
+      return { label: "On Target", color: "good" };
+    }
+    return { label: "High", color: "bad" };
+  }
+
+  // greater_than
+  const t = benchmark.target as number;
+  if (value >= t) {
+    return { label: "On Target", color: "good" };
+  }
+  return { label: "Low", color: "bad" };
+}
+
+const colorStyles: Record<PerformanceColor, string> = {
+  good: "bg-green-100 text-green-700",
+  bad: "bg-red-100 text-red-700",
+  neutral: "bg-gray-100 text-gray-500",
 };
 
-const labels: Record<ConfidenceLevel, string> = {
-  none: "No data",
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-};
+interface Props {
+  label: PerformanceLevel;
+  color: PerformanceColor;
+}
 
-export function ConfidenceBadge({ level }: { level: ConfidenceLevel }) {
+export function PerformanceBadge({ label, color }: Props) {
   return (
-    <Badge variant="outline" className={styles[level]}>
-      {labels[level]}
+    <Badge variant="outline" className={colorStyles[color]}>
+      {label}
     </Badge>
   );
 }

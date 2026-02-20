@@ -1,6 +1,6 @@
 "use client";
 
-import { ConfidenceBadge } from "./confidence-badge";
+import { PerformanceBadge, getPerformanceLevel } from "./confidence-badge";
 import { formatMetric } from "@/lib/utils";
 import type { KpiResult } from "@/lib/types";
 
@@ -10,7 +10,9 @@ export function KpiCell({ kpi }: { kpi: KpiResult }) {
   const ciLower = formatMetric(ci.lower, benchmark.format);
   const ciUpper = formatMetric(ci.upper, benchmark.format);
 
-  // Determine color based on pass/fail
+  const perf = getPerformanceLevel(value, benchmark, ci);
+
+  // Value color based on pass/fail
   let valueColor = "text-foreground";
   if (kpi.confidentlyPassing) valueColor = "text-green-600";
   else if (kpi.confidentlyFailing) valueColor = "text-red-600";
@@ -32,7 +34,7 @@ export function KpiCell({ kpi }: { kpi: KpiResult }) {
     <div className="space-y-1">
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">{benchmark.label}</span>
-        <ConfidenceBadge level={ci.confidence} />
+        <PerformanceBadge label={perf.label} color={perf.color} />
       </div>
       <div className={`text-lg font-semibold ${valueColor}`}>{formatted}</div>
       {ci.confidence !== "none" && (
@@ -51,7 +53,6 @@ function BenchmarkBar({ kpi }: { kpi: KpiResult }) {
   const { benchmark, value, ci } = kpi;
 
   // Determine bar range based on benchmark type
-  let barMin = 0;
   let barMax: number;
   let targetPos: number | [number, number];
 

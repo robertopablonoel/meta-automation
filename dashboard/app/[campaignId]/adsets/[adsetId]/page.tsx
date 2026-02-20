@@ -65,7 +65,13 @@ export default function AdSetDetail() {
 
     const adName = ad.name as string;
     const parsed = parseAdName(adName);
-    const mapping = mappingMap.get(adName);
+    // Mappings are stored without the "Ad - " prefix
+    const cleanedName = adName.replace(/^Ad\s*-\s*/, "");
+    const mapping = mappingMap.get(cleanedName) || mappingMap.get(adName);
+    const filename = mapping?.filename || parsed?.filename;
+    const mediaType =
+      mapping?.media_type ||
+      (filename && /\.(mp4|mov|avi|mkv)$/i.test(filename) ? "video" : "image");
 
     return {
       id: ad.id as string,
@@ -73,10 +79,10 @@ export default function AdSetDetail() {
       status: ad.status as string,
       metrics,
       recommendation,
-      filename: mapping?.filename || parsed?.filename,
+      filename,
       conceptName: mapping?.concept_name || parsed?.concept,
       subGroupName: mapping?.sub_group_name || parsed?.subGroup,
-      mediaType: mapping?.media_type,
+      mediaType,
     };
   });
 

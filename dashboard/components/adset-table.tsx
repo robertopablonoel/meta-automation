@@ -99,12 +99,12 @@ export function AdSetTable({ adsets, campaignId }: Props) {
             <TableHead className="text-xs">Stage</TableHead>
             <SortHeader label="Action" sKey="recommendation" />
             <SortHeader label="Spend" sKey="spend" />
+            <SortHeader label="CPC" sKey="cpc" />
             <SortHeader label="Impr." sKey="impressions" />
             <SortHeader label="CPM" sKey="cpm" />
             <SortHeader label="CTR" sKey="ctr" />
             <SortHeader label="Hook" sKey="hookRate" />
             <SortHeader label="Hold" sKey="holdRate" />
-            <SortHeader label="CPC" sKey="cpc" />
             <SortHeader label="CVR" sKey="cvr" />
             <SortHeader label="CPA" sKey="cpa" />
             <SortHeader label="ROAS" sKey="roas" />
@@ -149,6 +149,7 @@ export function AdSetTable({ adsets, campaignId }: Props) {
                 <RecommendationBadge recommendation={adset.recommendation} />
               </TableCell>
               <TableCell className="tabular-nums text-sm">{formatCurrency(adset.metrics.spend)}</TableCell>
+              <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("cpc", adset.metrics.cpc)}`}>{formatCurrency(adset.metrics.cpc)}</TableCell>
               <TableCell className="tabular-nums text-sm">{formatNumber(adset.metrics.impressions)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("cpm", adset.metrics.cpm)}`}>{formatCurrency(adset.metrics.cpm)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("ctr", adset.metrics.ctr)}`}>{formatPercent(adset.metrics.ctr)}</TableCell>
@@ -158,7 +159,6 @@ export function AdSetTable({ adsets, campaignId }: Props) {
               <TableCell className={`tabular-nums text-sm font-medium ${adset.metrics.holdRate != null ? getMetricColor("holdRate", adset.metrics.holdRate) : ""}`}>
                 {adset.metrics.holdRate != null ? formatPercent(adset.metrics.holdRate) : "-"}
               </TableCell>
-              <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("cpc", adset.metrics.cpc)}`}>{formatCurrency(adset.metrics.cpc)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("cvr", adset.metrics.cvr)}`}>{formatPercent(adset.metrics.cvr)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${adset.metrics.cpa > 0 ? getMetricColor("cpa", adset.metrics.cpa) : ""}`}>
                 {adset.metrics.cpa > 0 ? formatCurrency(adset.metrics.cpa) : "-"}

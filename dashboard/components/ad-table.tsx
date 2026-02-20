@@ -79,10 +79,10 @@ export function AdTable({ ads, campaignId }: Props) {
             <TableHead className="text-xs">Action</TableHead>
             <TableHead className="text-xs">Type</TableHead>
             <SortHeader label="Spend" sKey="spend" />
+            <SortHeader label="CPC" sKey="cpc" />
             <SortHeader label="Impr." sKey="impressions" />
             <SortHeader label="CPM" sKey="cpm" />
             <SortHeader label="CTR" sKey="ctr" />
-            <SortHeader label="CPC" sKey="cpc" />
             <SortHeader label="CVR" sKey="cvr" />
             <SortHeader label="CPA" sKey="cpa" />
             <SortHeader label="ROAS" sKey="roas" />
@@ -96,10 +96,10 @@ export function AdTable({ ads, campaignId }: Props) {
                 i % 2 === 0 ? "" : "bg-muted/20"
               } hover:bg-muted/40 transition-colors`}
             >
-              <TableCell className="max-w-[200px]">
+              <TableCell className="max-w-[250px]">
                 <Link
                   href={`/${campaignId}/ads/${ad.id}`}
-                  className="hover:underline font-medium text-sm"
+                  className="hover:underline font-medium text-sm block truncate"
                 >
                   {ad.filename || ad.name}
                 </Link>
@@ -120,10 +120,10 @@ export function AdTable({ ads, campaignId }: Props) {
                 )}
               </TableCell>
               <TableCell className="tabular-nums text-sm">{formatCurrency(ad.metrics.spend)}</TableCell>
+              <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("cpc", ad.metrics.cpc)}`}>{formatCurrency(ad.metrics.cpc)}</TableCell>
               <TableCell className="tabular-nums text-sm">{formatNumber(ad.metrics.impressions)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("cpm", ad.metrics.cpm)}`}>{formatCurrency(ad.metrics.cpm)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("ctr", ad.metrics.ctr)}`}>{formatPercent(ad.metrics.ctr)}</TableCell>
-              <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("cpc", ad.metrics.cpc)}`}>{formatCurrency(ad.metrics.cpc)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("cvr", ad.metrics.cvr)}`}>{formatPercent(ad.metrics.cvr)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${ad.metrics.cpa > 0 ? getMetricColor("cpa", ad.metrics.cpa) : ""}`}>
                 {ad.metrics.cpa > 0 ? formatCurrency(ad.metrics.cpa) : "-"}

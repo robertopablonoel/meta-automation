@@ -1,21 +1,25 @@
 "use client";
 
+import { useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useCampaignInsights } from "@/hooks/use-campaign-insights";
 import { useAdSetInsights } from "@/hooks/use-adset-insights";
+import { useCampaignAds } from "@/hooks/use-campaign-ads";
 import { useConcepts, useAdMappings } from "@/hooks/use-metadata";
 import { useDateRange } from "./layout";
 import { CampaignSummaryCards } from "@/components/campaign-summary-cards";
 import { AdSetTable } from "@/components/adset-table";
+import { WinnersSection } from "@/components/winners-section";
 import { KpiCell } from "@/components/kpi-cell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { computeMetrics } from "@/lib/metrics";
 import { evaluateKpis } from "@/lib/recommendations";
 import { getRecommendation } from "@/lib/recommendations";
-import { softBenchmarks, hardBenchmarks, getCpaTarget } from "@/lib/benchmarks";
+import { softBenchmarks, hardBenchmarks } from "@/lib/benchmarks";
 import { parseAdName } from "@/lib/meta-fields";
-import type { AdSetRow, ComputedMetrics } from "@/lib/types";
+import { classifyAd } from "@/lib/winners";
+import type { AdSetRow, ComputedMetrics, WinnerAd } from "@/lib/types";
 
 const FRONT_END_PRICE = parseFloat(process.env.NEXT_PUBLIC_FRONT_END_PRICE || "29.99");
 
@@ -30,10 +34,61 @@ export default function CampaignOverview() {
     campaignId,
     dateRange
   );
+  const { ads: allAds, isLoading: adsLoading } = useCampaignAds(
+    campaignId,
+    dateRange
+  );
   const { concepts } = useConcepts(campaignId);
   const { mappings } = useAdMappings(campaignId);
 
   const isLoading = insightsLoading || adsetsLoading;
+
+  // Classify all ads into winners/trending
+  const { winners, trending } = useMemo(() => {
+    const w: WinnerAd[] = [];
+    const t: WinnerAd[] = [];
+
+    for (const ad of allAds) {
+      const insightsData = (ad.insights as { data: Record<string, unknown>[] })?.data?.[0];
+      if (!insightsData) continue;
+
+      const metrics = computeMetrics(insightsData);
+      const { classification, recommendation, kpis } = classifyAd(metrics, FRONT_END_PRICE);
+
+      if (!classification) continue;
+
+      const adName = ad.name as string;
+      const parsed = parseAdName(adName);
+
+      const winnerAd: WinnerAd = {
+        id: ad.id as string,
+        name: adName,
+        adsetId: ad.adset_id as string,
+        metrics,
+        recommendation,
+        classification,
+        kpiSummary: {
+          passing: kpis.filter((k) => k.passing).length,
+          confidentlyPassing: kpis.filter((k) => k.confidentlyPassing).length,
+          total: kpis.length,
+        },
+        conceptName: parsed?.concept,
+        filename: parsed?.filename,
+      };
+
+      if (classification === "winner") {
+        w.push(winnerAd);
+      } else {
+        t.push(winnerAd);
+      }
+    }
+
+    // Sort by ROAS descending
+    w.sort((a, b) => b.metrics.roas - a.metrics.roas);
+    t.sort((a, b) => b.metrics.roas - a.metrics.roas);
+
+    return { winners: w, trending: t };
+  }, [allAds]);
 
   if (isLoading) {
     return (
@@ -65,11 +120,9 @@ export default function CampaignOverview() {
     const recommendation = getRecommendation(metrics, FRONT_END_PRICE);
 
     // Try to match ad set name to a concept
-    // Ad set names often contain the concept name
     const adsetName = adset.name as string;
     let conceptName: string | undefined;
     let conceptDisplayName: string | undefined;
-
     let awarenessStage: string | undefined;
 
     for (const [name, concept] of conceptMap) {
@@ -139,6 +192,14 @@ export default function CampaignOverview() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Winners & Trending */}
+      <WinnersSection
+        winners={winners}
+        trending={trending}
+        campaignId={campaignId}
+        isLoading={adsLoading}
+      />
 
       {/* Ad Sets table */}
       <Card>

@@ -68,3 +68,35 @@ CREATE INDEX IF NOT EXISTS idx_descriptions_filename ON ad_descriptions(campaign
 CREATE INDEX IF NOT EXISTS idx_copy_campaign_concept ON copy_variations(campaign_id, concept_name);
 CREATE INDEX IF NOT EXISTS idx_mappings_campaign ON ad_mappings(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_mappings_ad_name ON ad_mappings(campaign_id, ad_name);
+
+-- Cached metrics from Meta API (populated by metrics_sync.py)
+CREATE TABLE IF NOT EXISTS metrics_cache (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  entity_type TEXT NOT NULL,         -- 'campaign', 'adset', 'ad'
+  entity_id TEXT NOT NULL,           -- Meta object ID
+  parent_id TEXT,                    -- campaign_id for adsets, adset_id for ads
+  campaign_id TEXT NOT NULL,         -- top-level campaign ID (for easy filtering)
+  name TEXT,
+  status TEXT,
+  insights JSONB,                    -- raw Meta insights blob (the data[0] object)
+  extra_fields JSONB,               -- non-insights fields (creative, adset_id, etc.)
+  synced_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(entity_type, entity_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_mc_campaign ON metrics_cache(entity_type, entity_id) WHERE entity_type = 'campaign';
+CREATE INDEX IF NOT EXISTS idx_mc_adsets ON metrics_cache(campaign_id, entity_type) WHERE entity_type = 'adset';
+CREATE INDEX IF NOT EXISTS idx_mc_ads_by_adset ON metrics_cache(parent_id, entity_type) WHERE entity_type = 'ad';
+CREATE INDEX IF NOT EXISTS idx_mc_ads_by_campaign ON metrics_cache(campaign_id, entity_type) WHERE entity_type = 'ad';
+
+-- Sync run log
+CREATE TABLE IF NOT EXISTS sync_log (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  started_at TIMESTAMPTZ DEFAULT now(),
+  completed_at TIMESTAMPTZ,
+  campaigns_synced INT DEFAULT 0,
+  adsets_synced INT DEFAULT 0,
+  ads_synced INT DEFAULT 0,
+  status TEXT DEFAULT 'running',     -- 'running', 'completed', 'failed'
+  error_message TEXT
+);

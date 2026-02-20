@@ -206,3 +206,19 @@ export interface AdRow {
   subGroupName?: string;
   mediaType?: string;
 }
+
+export interface WinnerAd {
+  id: string;
+  name: string;
+  adsetId: string;
+  metrics: ComputedMetrics;
+  recommendation: Recommendation;
+  classification: "winner" | "trending";
+  kpiSummary: {
+    passing: number;
+    confidentlyPassing: number;
+    total: number;
+  };
+  conceptName?: string;
+  filename?: string;
+}

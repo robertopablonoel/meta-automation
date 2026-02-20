@@ -3,6 +3,8 @@
 import { CampaignSelector } from "@/components/campaign-selector";
 import { DateRangePicker } from "@/components/date-range-picker";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useSyncStatus } from "@/hooks/use-sync-status";
+import { formatRelativeTime } from "@/lib/utils";
 import { useState, createContext, useContext } from "react";
 import type { DateRange } from "@/lib/types";
 
@@ -35,6 +37,8 @@ export default function CampaignLayout({
     return { since: fmt(since), until: fmt(now) };
   });
 
+  const { lastSyncedAt } = useSyncStatus();
+
   return (
     <DateRangeContext.Provider value={{ dateRange, setDateRange }}>
       <div className="min-h-screen">
@@ -45,6 +49,11 @@ export default function CampaignLayout({
               <CampaignSelector />
             </div>
             <div className="flex items-center gap-2">
+              {lastSyncedAt && (
+                <span className="text-xs text-muted-foreground">
+                  Synced {formatRelativeTime(lastSyncedAt)}
+                </span>
+              )}
               <DateRangePicker
                 value={dateRange}
                 onChange={setDateRange}

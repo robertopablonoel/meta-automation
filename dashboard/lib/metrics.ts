@@ -1,17 +1,6 @@
 import type { ComputedMetrics } from "./types";
 import { extractAction, ACTION_TYPES } from "./meta-fields";
 
-// Extract with fallback: try custom conversion first, then standard pixel
-function extractWithFallback(
-  actions: { action_type: string; value: string }[] | undefined,
-  primary: string,
-  fallback: string
-): number {
-  const val = extractAction(actions, primary);
-  if (val > 0) return val;
-  return extractAction(actions, fallback);
-}
-
 export function computeMetrics(
   raw: Record<string, unknown>
 ): ComputedMetrics {
@@ -30,20 +19,12 @@ export function computeMetrics(
 
   const linkClicks = extractAction(actions, ACTION_TYPES.linkClick);
 
-  // Use custom conversions with fallback to standard pixel
-  const purchases = extractWithFallback(
-    actions,
-    ACTION_TYPES.purchase,
-    ACTION_TYPES.pixelPurchase
-  );
-  const addToCart = extractWithFallback(
-    actions,
-    ACTION_TYPES.addToCart,
-    ACTION_TYPES.pixelAddToCart
-  );
+  // Custom conversion events only — no fallback to standard pixel
+  const purchases = extractAction(actions, ACTION_TYPES.purchase);
+  const addToCart = extractAction(actions, ACTION_TYPES.addToCart);
 
-  // Revenue: from action_values using same custom conversion / fallback logic
-  const purchaseValue = extractPurchaseRevenue(actionValues);
+  // Revenue: custom conversion only
+  const purchaseValue = extractCustomRevenue(actionValues);
 
   const video3sViews = extractAction(actions, ACTION_TYPES.video3sView);
   const videoP50 = extractVideoMetric(raw.video_p50_watched_actions);
@@ -109,23 +90,12 @@ function extractVideoMetric(
   return action ? parseFloat(action.value) : 0;
 }
 
-function extractPurchaseRevenue(
+function extractCustomRevenue(
   actionValues: { action_type: string; value: string }[] | undefined
 ): number {
   if (!actionValues) return 0;
-  // Try custom conversion first, then standard pixel
   const custom = actionValues.find(
     (a) => a.action_type === ACTION_TYPES.purchase
   );
-  if (custom) return parseFloat(custom.value);
-  const pixel = actionValues.find(
-    (a) => a.action_type === ACTION_TYPES.pixelPurchase
-  );
-  if (pixel) return parseFloat(pixel.value);
-  // Fallback: omni_purchase
-  const omni = actionValues.find(
-    (a) => a.action_type === "omni_purchase"
-  );
-  if (omni) return parseFloat(omni.value);
-  return 0;
+  return custom ? parseFloat(custom.value) : 0;
 }

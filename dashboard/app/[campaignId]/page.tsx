@@ -65,6 +65,9 @@ export default function CampaignOverview() {
 
   const isLoading = insightsLoading || adsetsLoading;
 
+  // Campaign spend for relative Starving thresholds
+  const topLevelCampaignSpend = insights ? computeMetrics(insights).spend : 0;
+
   // Classify all ads into winners/trending
   const { winners, trending } = useMemo(() => {
     const w: WinnerAd[] = [];
@@ -75,7 +78,7 @@ export default function CampaignOverview() {
       if (!insightsData) continue;
 
       const metrics = computeMetrics(insightsData);
-      const { classification, recommendation, kpis } = classifyAd(metrics, FRONT_END_PRICE);
+      const { classification, recommendation, kpis } = classifyAd(metrics, FRONT_END_PRICE, topLevelCampaignSpend);
 
       if (!classification) continue;
 
@@ -110,7 +113,7 @@ export default function CampaignOverview() {
     t.sort((a, b) => b.metrics.roas - a.metrics.roas);
 
     return { winners: w, trending: t };
-  }, [allAds]);
+  }, [allAds, topLevelCampaignSpend]);
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange}>
@@ -179,6 +182,7 @@ function OverviewContent({
   trending: WinnerAd[];
 }) {
   const campaignMetrics = insights ? computeMetrics(insights) : null;
+  const campaignSpend = campaignMetrics?.spend ?? 0;
 
   // Compute per-ad recommendations grouped by adset
   const adActionsByAdset = useMemo(() => {
@@ -189,7 +193,7 @@ function OverviewContent({
       const insightsData = (ad.insights as { data: Record<string, unknown>[] })?.data?.[0];
       if (!insightsData) continue;
       const m = computeMetrics(insightsData);
-      const rec = getRecommendation(m, FRONT_END_PRICE);
+      const rec = getRecommendation(m, FRONT_END_PRICE, campaignSpend);
       const summary = map.get(adsetId) || { kill: 0, watch: 0, scale: 0, starving: 0, total: 0 };
       summary.total++;
       const key = rec.action.toLowerCase() as keyof Omit<AdActionSummary, "total">;
@@ -197,7 +201,7 @@ function OverviewContent({
       map.set(adsetId, summary);
     }
     return map;
-  }, [allAds]);
+  }, [allAds, campaignSpend]);
 
   // Build ad set rows with concept metadata
   const conceptMap = new Map(concepts.map((c) => [c.name, c]));
@@ -207,7 +211,7 @@ function OverviewContent({
     const metrics: ComputedMetrics = insightsData
       ? computeMetrics(insightsData)
       : computeMetrics({} as Record<string, unknown>);
-    const recommendation = getRecommendation(metrics, FRONT_END_PRICE);
+    const recommendation = getRecommendation(metrics, FRONT_END_PRICE, campaignSpend);
 
     // Try to match ad set name to a concept
     const adsetName = adset.name as string;

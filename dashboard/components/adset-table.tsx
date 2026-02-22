@@ -15,10 +15,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { RecommendationBadge } from "./recommendation-badge";
+import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatPercent, formatNumber } from "@/lib/utils";
 import { getMetricColor } from "@/lib/benchmarks";
-import type { AdSetRow } from "@/lib/types";
+import type { AdSetRow, AdActionSummary } from "@/lib/types";
 
 function extractStageNumbers(text: string): string {
   const match = text.match(/Stage\s+([\d][\d\s,\-]*[\d]?)/i);
@@ -28,14 +28,56 @@ function extractStageNumbers(text: string): string {
   return text.slice(0, 10);
 }
 
-const stripeClass: Record<string, string> = {
-  Kill: "row-stripe-kill",
-  Watch: "row-stripe-watch",
-  Scale: "row-stripe-scale",
-  Starving: "row-stripe-starving",
+const pillStyles: Record<string, string> = {
+  Kill: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/50 dark:text-red-300 dark:border-red-800",
+  Watch: "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-800",
+  Scale: "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/50 dark:text-green-300 dark:border-green-800",
+  Starving: "bg-gray-100 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700",
 };
 
-type SortKey = "name" | "spend" | "impressions" | "cpm" | "ctr" | "hookRate" | "holdRate" | "cpc" | "cvr" | "cpa" | "roas" | "recommendation";
+function getRowStripe(adActions?: AdActionSummary): string {
+  if (!adActions || adActions.total === 0) return "";
+  if (adActions.scale > 0) return "row-stripe-scale";
+  if (adActions.kill > 0 && adActions.watch === 0 && adActions.scale === 0) return "row-stripe-kill";
+  return "";
+}
+
+function AdActionPills({ adActions }: { adActions?: AdActionSummary }) {
+  if (!adActions || adActions.total === 0) {
+    return <span className="text-xs text-muted-foreground">No ads</span>;
+  }
+
+  const pills: { label: string; count: number; action: string }[] = [];
+  if (adActions.scale > 0) pills.push({ label: "Scale", count: adActions.scale, action: "Scale" });
+  if (adActions.kill > 0) pills.push({ label: "Kill", count: adActions.kill, action: "Kill" });
+  if (adActions.watch > 0) pills.push({ label: "Watch", count: adActions.watch, action: "Watch" });
+  if (adActions.starving > 0) pills.push({ label: "Starving", count: adActions.starving, action: "Starving" });
+
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      {pills.map((p) => (
+        <Badge
+          key={p.action}
+          variant="outline"
+          className={`${pillStyles[p.action]} text-[10px] px-1.5 py-0`}
+        >
+          {p.count} {p.label}
+        </Badge>
+      ))}
+    </div>
+  );
+}
+
+// Sort priority: ad sets with Scale ads first, then Kill-only, then Watch, then Starving
+function getActionSortValue(adActions?: AdActionSummary): number {
+  if (!adActions || adActions.total === 0) return 4;
+  if (adActions.scale > 0) return 0;
+  if (adActions.kill > 0) return 1;
+  if (adActions.watch > 0) return 2;
+  return 3;
+}
+
+type SortKey = "name" | "spend" | "impressions" | "cpm" | "ctr" | "hookRate" | "holdRate" | "cpc" | "cvr" | "cpa" | "roas" | "frequency" | "adActions";
 
 interface Props {
   adsets: AdSetRow[];
@@ -56,10 +98,9 @@ export function AdSetTable({ adsets, campaignId }: Props) {
           aVal = a.name;
           bVal = b.name;
           break;
-        case "recommendation":
-          const order = { Kill: 0, Starving: 1, Watch: 2, Scale: 3 };
-          aVal = order[a.recommendation.action];
-          bVal = order[b.recommendation.action];
+        case "adActions":
+          aVal = getActionSortValue(a.adActions);
+          bVal = getActionSortValue(b.adActions);
           break;
         default:
           aVal = (a.metrics as unknown as Record<string, number | null>)[sortKey] ?? 0;
@@ -97,12 +138,13 @@ export function AdSetTable({ adsets, campaignId }: Props) {
           <TableRow className="bg-muted/40">
             <SortHeader label="Ad Set" sKey="name" />
             <TableHead className="text-xs">Stage</TableHead>
-            <SortHeader label="Action" sKey="recommendation" />
+            <SortHeader label="Ads" sKey="adActions" />
             <SortHeader label="Spend" sKey="spend" />
             <SortHeader label="CPC" sKey="cpc" />
             <SortHeader label="Impr." sKey="impressions" />
             <SortHeader label="CPM" sKey="cpm" />
             <SortHeader label="CTR" sKey="ctr" />
+            <SortHeader label="Freq" sKey="frequency" />
             <SortHeader label="Hook" sKey="hookRate" />
             <SortHeader label="Hold" sKey="holdRate" />
             <SortHeader label="CVR" sKey="cvr" />
@@ -114,7 +156,7 @@ export function AdSetTable({ adsets, campaignId }: Props) {
           {sorted.map((adset, i) => (
             <TableRow
               key={adset.id}
-              className={`${stripeClass[adset.recommendation.action] || ""} ${
+              className={`${getRowStripe(adset.adActions)} ${
                 i % 2 === 0 ? "" : "bg-muted/20"
               } hover:bg-muted/40 transition-colors`}
             >
@@ -146,22 +188,14 @@ export function AdSetTable({ adsets, campaignId }: Props) {
                 )}
               </TableCell>
               <TableCell>
-                {adset.adActions && adset.adActions.kill > 0 ? (
-                  <div className="flex items-center gap-1.5">
-                    <RecommendationBadge recommendation={adset.recommendation} />
-                    <span className="text-[11px] text-red-600 dark:text-red-400 whitespace-nowrap">
-                      {adset.adActions.kill} ad{adset.adActions.kill > 1 ? "s" : ""} to kill
-                    </span>
-                  </div>
-                ) : (
-                  <RecommendationBadge recommendation={adset.recommendation} />
-                )}
+                <AdActionPills adActions={adset.adActions} />
               </TableCell>
               <TableCell className="tabular-nums text-sm">{formatCurrency(adset.metrics.spend)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("cpc", adset.metrics.cpc)}`}>{formatCurrency(adset.metrics.cpc)}</TableCell>
               <TableCell className="tabular-nums text-sm">{formatNumber(adset.metrics.impressions)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("cpm", adset.metrics.cpm)}`}>{formatCurrency(adset.metrics.cpm)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("ctr", adset.metrics.ctr)}`}>{formatPercent(adset.metrics.ctr)}</TableCell>
+              <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("frequency", adset.metrics.frequency)}`}>{adset.metrics.frequency.toFixed(2)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${adset.metrics.hookRate != null ? getMetricColor("hookRate", adset.metrics.hookRate) : ""}`}>
                 {adset.metrics.hookRate != null ? formatPercent(adset.metrics.hookRate) : "-"}
               </TableCell>
@@ -181,7 +215,7 @@ export function AdSetTable({ adsets, campaignId }: Props) {
           ))}
           {sorted.length === 0 && (
             <TableRow>
-              <TableCell colSpan={13} className="text-center text-muted-foreground py-12">
+              <TableCell colSpan={14} className="text-center text-muted-foreground py-12">
                 <div className="space-y-2">
                   <p className="text-sm font-medium">No ad sets found</p>
                   <p className="text-xs">Try selecting a different date range or campaign</p>

@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { useAdInsights } from "@/hooks/use-ad-insights";
 import { useAdSetInsights } from "@/hooks/use-adset-insights";
+import { useCampaignInsights } from "@/hooks/use-campaign-insights";
 import { useConcepts, useAdMappings } from "@/hooks/use-metadata";
 import { useDateRange } from "../../layout";
 import { Breadcrumbs } from "@/components/breadcrumbs";
@@ -28,8 +29,11 @@ export default function AdSetDetail() {
   const { dateRange } = useDateRange();
   const { ads, isLoading: adsLoading } = useAdInsights(adsetId, dateRange);
   const { adsets } = useAdSetInsights(campaignId, dateRange);
+  const { insights: campaignInsightsRaw } = useCampaignInsights(campaignId, dateRange);
   const { concepts } = useConcepts(campaignId);
   const { mappings } = useAdMappings(campaignId);
+
+  const campaignSpend = campaignInsightsRaw ? computeMetrics(campaignInsightsRaw).spend : 0;
 
   // Find this ad set
   const adset = adsets.find((a: Record<string, unknown>) => a.id === adsetId);
@@ -41,7 +45,7 @@ export default function AdSetDetail() {
     ? computeMetrics(adsetInsights)
     : null;
   const adsetRecommendation = adsetMetrics
-    ? getRecommendation(adsetMetrics, FRONT_END_PRICE)
+    ? getRecommendation(adsetMetrics, FRONT_END_PRICE, campaignSpend)
     : null;
 
   // Match concept
@@ -61,7 +65,7 @@ export default function AdSetDetail() {
     const metrics: ComputedMetrics = insightsData
       ? computeMetrics(insightsData)
       : computeMetrics({} as Record<string, unknown>);
-    const recommendation = getRecommendation(metrics, FRONT_END_PRICE);
+    const recommendation = getRecommendation(metrics, FRONT_END_PRICE, campaignSpend);
 
     const adName = ad.name as string;
     const parsed = parseAdName(adName);
@@ -123,11 +127,6 @@ export default function AdSetDetail() {
 
       {/* Header */}
       <h2 className="text-2xl font-bold tracking-tight">{adsetName}</h2>
-
-      {/* Recommendation banner */}
-      {adsetRecommendation && (
-        <RecommendationBanner recommendation={adsetRecommendation} entityLabel="ad set" />
-      )}
 
       {/* Concept card */}
       {matchedConcept && <ConceptCard concept={matchedConcept} />}

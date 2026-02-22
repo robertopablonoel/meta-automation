@@ -91,71 +91,116 @@ export function evaluateKpis(
 
 export function getRecommendation(
   metrics: ComputedMetrics,
-  frontEndPrice: number
+  frontEndPrice: number,
+  campaignSpend?: number
 ): Recommendation {
   const reasoning: string[] = [];
+  const cpaTarget = getCpaTarget(frontEndPrice);
 
-  // Starving check
-  if (metrics.spend < 10 || metrics.impressions < 500) {
-    reasoning.push(
-      `Insufficient data: $${metrics.spend.toFixed(2)} spend, ${metrics.impressions} impressions`
-    );
+  // Starving: getting less than a fair share of campaign spend,
+  // or barely any delivery in absolute terms
+  const spendShare = campaignSpend && campaignSpend > 0
+    ? metrics.spend / campaignSpend
+    : null;
+  const isStarving = spendShare !== null
+    ? spendShare < 0.02 // <2% of campaign spend
+    : metrics.spend < 3 || metrics.impressions < 100; // absolute fallback
+
+  if (isStarving) {
+    const detail = spendShare !== null
+      ? `${(spendShare * 100).toFixed(1)}% of campaign spend ($${metrics.spend.toFixed(2)} / $${campaignSpend!.toFixed(2)})`
+      : `$${metrics.spend.toFixed(2)} spend, ${metrics.impressions} impressions`;
+    reasoning.push(`Insufficient delivery: ${detail}`);
     return { action: "Starving", reasoning };
   }
 
   const kpis = evaluateKpis(metrics, frontEndPrice);
+  const hasPurchases = metrics.purchases > 0;
+  const roas = metrics.roas;
 
-  const softKpis = kpis.filter((k) =>
-    softBenchmarks.some((sb) => sb.key === k.benchmark.key)
-  );
-  const hardKpis = kpis.filter((k) =>
-    hardBenchmarks.some((hb) => hb.key === k.benchmark.key)
-  );
+  // ── Conversion-first logic ──
+  // The #1 question: is this converting profitably?
 
-  const confidentlyFailing = softKpis.filter((k) => k.confidentlyFailing);
-  const confidentlyPassing = kpis.filter((k) => k.confidentlyPassing);
-  const hardFailing = hardKpis.filter((k) => k.confidentlyFailing);
+  // Kill: spent enough to know with zero conversions
+  // Tiered: more spend = lower traffic requirement
+  if (!hasPurchases) {
+    const spent2x = metrics.spend > cpaTarget * 2;  // ~$140
+    const spent3x = metrics.spend > cpaTarget * 3;  // ~$210
 
-  // Kill: 3+ soft KPIs confidently failing
-  if (confidentlyFailing.length >= 3) {
+    if (spent3x) {
+      // 3x CPA with 0 purchases — kill regardless of traffic
+      reasoning.push(
+        `$${metrics.spend.toFixed(2)} spent (>${(cpaTarget * 3).toFixed(0)} 3× CPA target) with 0 purchases`
+      );
+      return { action: "Kill", reasoning };
+    }
+
+    if (spent2x && metrics.linkClicks >= 30) {
+      // 2x CPA + decent traffic with 0 purchases
+      reasoning.push(
+        `$${metrics.spend.toFixed(2)} spent with 0 purchases across ${metrics.linkClicks} link clicks`
+      );
+      return { action: "Kill", reasoning };
+    }
+  }
+
+  // Kill: low volume but CPA is proven bad (1-4 purchases at > 2x CPA target)
+  if (hasPurchases && metrics.purchases < 5 && metrics.cpa > cpaTarget * 2) {
     reasoning.push(
-      `${confidentlyFailing.length} soft KPIs confidently failing: ${confidentlyFailing
-        .map((k) => k.benchmark.label)
-        .join(", ")}`
+      `${metrics.purchases} purchase${metrics.purchases > 1 ? "s" : ""} at $${metrics.cpa.toFixed(2)} CPA (>${(cpaTarget * 2).toFixed(0)} 2× target)`
     );
     return { action: "Kill", reasoning };
   }
 
-  // Kill: spent >2x CPA target with zero conversions and 50+ link clicks
-  const cpaTarget = getCpaTarget(frontEndPrice);
-  const zeroConvSpendThreshold = cpaTarget * 2;
-  if (metrics.spend > zeroConvSpendThreshold && metrics.purchases === 0 && metrics.linkClicks >= 50) {
+  // Kill: has conversions but confidently unprofitable (ROAS < 0.8 with enough data)
+  if (hasPurchases && metrics.purchases >= 5 && roas < 0.8) {
     reasoning.push(
-      `$${metrics.spend.toFixed(2)} spent (>${Math.round(zeroConvSpendThreshold)}) with 0 purchases across ${metrics.linkClicks} link clicks`
+      `${metrics.purchases} purchases but ROAS is ${roas.toFixed(2)}x (unprofitable)`
     );
     return { action: "Kill", reasoning };
   }
 
-  // Scale: 4+ KPIs confidently passing, no hard metric failing
-  if (confidentlyPassing.length >= 4 && hardFailing.length === 0) {
-    reasoning.push(
-      `${confidentlyPassing.length} KPIs confidently passing: ${confidentlyPassing
-        .map((k) => k.benchmark.label)
-        .join(", ")}`
-    );
-    return { action: "Scale", reasoning };
+  // Scale: converting profitably with enough signal
+  if (hasPurchases && roas >= 1.0) {
+    // Need at least a few conversions to trust the signal
+    if (metrics.purchases >= 3 && metrics.cpa <= cpaTarget * 1.5) {
+      reasoning.push(
+        `${metrics.purchases} purchases at ${roas.toFixed(2)}x ROAS, $${metrics.cpa.toFixed(2)} CPA`
+      );
+
+      // Flag soft KPI concerns as context, but don't block Scale
+      const softFailing = kpis
+        .filter((k) => softBenchmarks.some((sb) => sb.key === k.benchmark.key))
+        .filter((k) => k.confidentlyFailing);
+      if (softFailing.length > 0) {
+        reasoning.push(
+          `Note: ${softFailing.map((k) => k.benchmark.label).join(", ")} below target — may improve with optimization`
+        );
+      }
+
+      return { action: "Scale", reasoning };
+    }
   }
 
-  // Watch: everything else
-  const passingCount = kpis.filter((k) => k.passing).length;
-  const failingCount = kpis.filter((k) => !k.passing).length;
-  reasoning.push(
-    `${passingCount} KPIs passing, ${failingCount} failing — needs more data`
-  );
-  if (confidentlyFailing.length > 0) {
+  // Watch: everything else — not enough data or mixed signals
+  if (hasPurchases) {
     reasoning.push(
-      `Concern: ${confidentlyFailing.map((k) => k.benchmark.label).join(", ")} confidently failing`
+      `${metrics.purchases} purchases, ${roas.toFixed(2)}x ROAS, $${metrics.cpa.toFixed(2)} CPA — accumulating data`
+    );
+  } else {
+    reasoning.push(
+      `$${metrics.spend.toFixed(2)} spent, ${metrics.linkClicks} link clicks, 0 purchases — needs more data`
     );
   }
+
+  const softFailing = kpis
+    .filter((k) => softBenchmarks.some((sb) => sb.key === k.benchmark.key))
+    .filter((k) => k.confidentlyFailing);
+  if (softFailing.length > 0) {
+    reasoning.push(
+      `Concern: ${softFailing.map((k) => k.benchmark.label).join(", ")} below target`
+    );
+  }
+
   return { action: "Watch", reasoning };
 }

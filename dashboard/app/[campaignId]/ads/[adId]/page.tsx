@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useSingleAdInsights } from "@/hooks/use-ad-insights";
+import { useCampaignInsights } from "@/hooks/use-campaign-insights";
 import {
   useConcepts,
   useAdDescriptions,
@@ -29,8 +30,11 @@ export default function AdDetail() {
   }>();
   const { dateRange } = useDateRange();
   const { ad, isLoading: adLoading } = useSingleAdInsights(adId, dateRange);
+  const { insights: campaignInsightsRaw } = useCampaignInsights(campaignId, dateRange);
   const { concepts } = useConcepts(campaignId);
   const { mappings } = useAdMappings(campaignId);
+
+  const campaignSpend = campaignInsightsRaw ? computeMetrics(campaignInsightsRaw).spend : 0;
 
   const adName = (ad?.name as string) || "";
   const parsed = parseAdName(adName);
@@ -52,7 +56,7 @@ export default function AdDetail() {
     ? computeMetrics(insightsData)
     : null;
   const recommendation = metrics
-    ? getRecommendation(metrics, FRONT_END_PRICE)
+    ? getRecommendation(metrics, FRONT_END_PRICE, campaignSpend)
     : null;
 
   const kpis = metrics ? evaluateKpis(metrics, FRONT_END_PRICE) : [];

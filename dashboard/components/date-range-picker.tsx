@@ -6,7 +6,7 @@ import type { DateRange } from "@/lib/types";
 
 interface Props {
   value: DateRange | undefined;
-  onChange: (range: DateRange) => void;
+  onChange: (range: DateRange | undefined) => void;
 }
 
 const presets = [
@@ -25,17 +25,15 @@ function formatDate(d: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function getRange(days: number): DateRange {
+function getRange(days: number): DateRange | undefined {
+  if (days === -1) {
+    // Lifetime: return undefined so we use the Supabase cache
+    return undefined;
+  }
   const now = new Date();
   const today = formatDate(now);
   if (days === 0) {
     return { since: today, until: today };
-  }
-  if (days === -1) {
-    // Lifetime: go back 36 months (Meta's max is 37), include today
-    const since = new Date(now);
-    since.setMonth(since.getMonth() - 36);
-    return { since: formatDate(since), until: today };
   }
   const since = new Date(now);
   since.setDate(since.getDate() - days);

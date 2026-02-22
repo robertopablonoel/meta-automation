@@ -193,9 +193,9 @@ def _build_promoted_object() -> dict:
 def create_ad_set(campaign_id: str, concept_name: str) -> str:
     """Create a paused ad set for a creative concept. Returns ad set ID.
 
-    Uses broad targeting with Advantage+ audience:
-    - US, 18-65, All genders
-    - Advantage+ audience enabled
+    Uses broad targeting:
+    - US, 18-65, Women only
+    - Advantage+ audience OFF (gender is a hard constraint)
     - No ad set budget (uses campaign CBO)
     - Optimizes for PURCHASE via pixel + custom event
     """
@@ -213,8 +213,9 @@ def create_ad_set(campaign_id: str, concept_name: str) -> str:
             },
             "age_min": 18,
             "age_max": 65,
+            "genders": [2],  # Women only (Meta API: 1=male, 2=female)
             "targeting_automation": {
-                "advantage_audience": 1,
+                "advantage_audience": 0,  # Off — gender must be a hard constraint
             },
         },
         AdSet.Field.status: AdSet.Status.paused,
@@ -334,12 +335,15 @@ def create_video_ad_with_text_variations(
     variations: list[dict],
     ad_name: str,
 ) -> str:
-    """Create a video ad with 1 video and multiple text variations.
+    """Create a video ad with 1 text variation.
 
-    Uses object_story_spec.video_data (with thumbnail image_hash) +
-    asset_feed_spec with videos key + degrees_of_freedom_spec.
+    Partnership ads (with instagram_user_id) only support a single
+    body/title/description — uses the first variation only.
     """
     account = AdAccount(META_AD_ACCOUNT_ID)
+
+    # Partnership ads only support 1 text variation
+    v = variations[0]
 
     object_story_spec = {
         "page_id": META_PAGE_ID,
@@ -357,9 +361,9 @@ def create_video_ad_with_text_variations(
 
     asset_feed_spec = {
         "videos": [{"video_id": video_id, "thumbnail_hash": thumbnail_hash}],
-        "bodies": [{"text": v["primary_text"]} for v in variations],
-        "titles": [{"text": v["headline"]} for v in variations],
-        "descriptions": [{"text": v["description"]} for v in variations],
+        "bodies": [{"text": v["primary_text"]}],
+        "titles": [{"text": v["headline"]}],
+        "descriptions": [{"text": v["description"]}],
         "link_urls": [{"website_url": LANDING_PAGE_URL}],
         "call_to_action_types": ["SHOP_NOW"],
         "ad_formats": ["AUTOMATIC_FORMAT"],

@@ -24,13 +24,15 @@ type SortKey =
   | "purchaseValue"
   | "cvr"
   | "cpa"
-  | "roas";
+  | "roas"
+  | "frequency";
 
 const columns: { key: SortKey; label: string }[] = [
   { key: "date", label: "Date" },
   { key: "spend", label: "Spend" },
   { key: "impressions", label: "Impr" },
   { key: "clicks", label: "Clicks" },
+  { key: "frequency", label: "Freq" },
   { key: "cpc", label: "CPC" },
   { key: "ctr", label: "CTR" },
   { key: "purchases", label: "Purchases" },
@@ -57,13 +59,15 @@ function formatCell(key: SortKey, row: DailyMetricRow): string {
       return formatPercent(v);
     case "roas":
       return `${v.toFixed(2)}x`;
+    case "frequency":
+      return v.toFixed(2);
     default:
       return formatNumber(v);
   }
 }
 
 function cellColor(key: SortKey, row: DailyMetricRow): string {
-  if (key === "date" || key === "spend" || key === "impressions" || key === "clicks" || key === "purchases" || key === "purchaseValue") return "";
+  if (key === "date" || key === "spend" || key === "impressions" || key === "clicks" || key === "purchases" || key === "purchaseValue" ) return "";
   return getMetricColor(key, row.metrics[key as keyof typeof row.metrics] as number);
 }
 

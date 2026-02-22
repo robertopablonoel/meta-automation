@@ -251,3 +251,13 @@ Each concept group gets 5 variations:
 - **primary_text**: 2-4 sentences, DR style, avatar's language, builds the mapped belief
 - **headline**: Under 40 chars, bold, scroll-stopping
 - **description**: Under 30 chars, reinforces headline or adds urgency
+
+## Planned: Test → Graduate → Iterate Loop (v2)
+
+The current pipeline generates many concepts and uploads them as separate ad sets for broad testing. The next version closes the feedback loop:
+
+1. **Test** — Pipeline generates concepts, uploads 1 ad set per concept, runs for ~1 week
+2. **Graduate** — `--graduate` flag (or standalone script) reads performance data from Supabase/Meta, identifies winning ads by custom ROAS/CPA, and creates a new consolidated campaign with 1-2 ad sets containing only proven winners at higher budget
+3. **Iterate** — Next test round feeds winning concept names + performance data back into `brand_context.py` so Claude generates new creative variations that riff on proven angles rather than starting from scratch
+
+This turns the pipeline from a one-shot generator into a continuous creative optimization loop: test broadly → scale winners → generate new variations of what works → repeat.

@@ -28,15 +28,8 @@ export default function CampaignLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Default to Lifetime: 36 months back through today
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
-    const now = new Date();
-    const since = new Date(now);
-    since.setMonth(since.getMonth() - 36);
-    const fmt = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    return { since: fmt(since), until: fmt(now) };
-  });
+  // Default to Lifetime (undefined = use Supabase cache)
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   const { lastSyncedAt, isSyncing, triggerSync } = useSyncStatus();
 

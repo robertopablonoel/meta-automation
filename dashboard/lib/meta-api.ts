@@ -98,3 +98,15 @@ export async function getSingleAdInsights(adId: string, dateRange?: DateRange) {
   }
   return metaFetch<Record<string, unknown>>(url);
 }
+
+export async function getCampaignAds(campaignId: string, dateRange?: DateRange) {
+  let url = `${baseUrl}/${campaignId}/ads?fields=${AD_FIELDS},insights.fields(${INSIGHTS_FIELDS})&limit=200&access_token=${accessToken}`;
+  if (dateRange) {
+    const timeRange = JSON.stringify({
+      since: dateRange.since,
+      until: dateRange.until,
+    });
+    url = `${baseUrl}/${campaignId}/ads?fields=${AD_FIELDS},insights.fields(${INSIGHTS_FIELDS}).time_range(${timeRange})&limit=200&access_token=${accessToken}`;
+  }
+  return metaFetchAll<Record<string, unknown>>(url);
+}

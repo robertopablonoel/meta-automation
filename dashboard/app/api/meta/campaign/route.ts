@@ -1,15 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { getCampaignInsights } from "@/lib/meta-api";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const id = searchParams.get("id");
+  const since = searchParams.get("since");
+  const until = searchParams.get("until");
 
   if (!id) {
     return NextResponse.json({ error: "Missing id parameter" }, { status: 400 });
   }
 
   try {
+    // If date range provided, fetch from Meta directly
+    if (since && until) {
+      const insights = await getCampaignInsights(id, { since, until });
+      return NextResponse.json({ data: insights });
+    }
+
+    // Otherwise use Supabase cache (lifetime)
     const { data, error } = await getSupabase()
       .from("metrics_cache")
       .select("insights")

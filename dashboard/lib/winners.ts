@@ -20,13 +20,14 @@ export type AdClassification = "winner" | "trending" | null;
  */
 export function classifyAd(
   metrics: ComputedMetrics,
-  frontEndPrice: number
+  frontEndPrice: number,
+  campaignSpend?: number
 ): {
   classification: AdClassification;
   recommendation: Recommendation;
   kpis: KpiResult[];
 } {
-  const recommendation = getRecommendation(metrics, frontEndPrice);
+  const recommendation = getRecommendation(metrics, frontEndPrice, campaignSpend);
   const kpis = evaluateKpis(metrics, frontEndPrice);
 
   const confidentlyPassing = kpis.filter((k) => k.confidentlyPassing);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { getAdInsights, getSingleAdInsights } from "@/lib/meta-api";
 
 interface MetricsCacheRow {
   entity_id: string;
@@ -25,6 +26,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const adsetId = searchParams.get("adset_id");
   const adId = searchParams.get("ad_id");
+  const since = searchParams.get("since");
+  const until = searchParams.get("until");
 
   if (!adsetId && !adId) {
     return NextResponse.json(
@@ -34,6 +37,17 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // If date range provided, fetch from Meta directly
+    if (since && until) {
+      if (adId) {
+        const ad = await getSingleAdInsights(adId, { since, until });
+        return NextResponse.json({ data: ad });
+      }
+      const ads = await getAdInsights(adsetId!, { since, until });
+      return NextResponse.json({ data: ads });
+    }
+
+    // Otherwise use Supabase cache (lifetime)
     if (adId) {
       const { data: row, error } = await getSupabase()
         .from("metrics_cache")

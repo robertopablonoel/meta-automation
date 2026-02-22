@@ -6,8 +6,8 @@ Reads pipeline output files and campaign_log.json, upserts everything to Supabas
 so the dashboard can join Meta metrics with pipeline metadata.
 
 Usage:
-    python publisher.py                          # Publish latest campaign
-    python publisher.py --campaign-id 12345      # Publish specific campaign
+    python scripts/publisher.py                          # Publish latest campaign
+    python scripts/publisher.py --campaign-id 12345      # Publish specific campaign
 """
 
 import argparse
@@ -17,11 +17,14 @@ import os
 import sys
 from pathlib import Path
 
+# Ensure repo root is on sys.path so pipeline package is importable
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from config import OUTPUT_DIR
+from pipeline.config import OUTPUT_DIR
 
 logging.basicConfig(
     level=logging.INFO,

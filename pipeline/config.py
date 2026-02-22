@@ -5,16 +5,16 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── Paths ──────────────────────────────────────────────────────────────────
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent  # repo root
 INPUT_DIR = BASE_DIR / "input_images"
 OUTPUT_DIR = BASE_DIR / "output"
 OUTPUT_JSON = OUTPUT_DIR / "ad_copy_output.json"
 OUTPUT_CSV = OUTPUT_DIR / "ad_copy_output.csv"
 
 # Brand doc PDFs
-AVATAR_SHEET_PDF = BASE_DIR / "03-avatar-sheet.pdf"
-OFFER_BRIEF_PDF = BASE_DIR / "04-offer-brief.pdf"
-NECESSARY_BELIEFS_PDF = BASE_DIR / "05-necessary-beliefs.pdf"
+AVATAR_SHEET_PDF = BASE_DIR / "brand" / "03-avatar-sheet.pdf"
+OFFER_BRIEF_PDF = BASE_DIR / "brand" / "04-offer-brief.pdf"
+NECESSARY_BELIEFS_PDF = BASE_DIR / "brand" / "05-necessary-beliefs.pdf"
 
 # ── Anthropic ──────────────────────────────────────────────────────────────
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")

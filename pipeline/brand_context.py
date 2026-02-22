@@ -1,6 +1,6 @@
 import pdfplumber
 
-from config import AVATAR_SHEET_PDF, OFFER_BRIEF_PDF, NECESSARY_BELIEFS_PDF
+from pipeline.config import AVATAR_SHEET_PDF, OFFER_BRIEF_PDF, NECESSARY_BELIEFS_PDF
 
 
 def extract_pdf_text(pdf_path: str) -> str:

@@ -7,8 +7,8 @@ and upserts them to Supabase. Dashboard reads from Supabase instead
 of hitting Meta directly (faster, no rate limits).
 
 Usage:
-    venv/bin/python metrics_sync.py                          # Sync all active campaigns
-    venv/bin/python metrics_sync.py --campaign-id 12345      # Sync specific campaign
+    venv/bin/python scripts/metrics_sync.py                          # Sync all active campaigns
+    venv/bin/python scripts/metrics_sync.py --campaign-id 12345      # Sync specific campaign
 """
 
 import argparse

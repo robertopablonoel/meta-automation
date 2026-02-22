@@ -106,9 +106,9 @@ Three PDFs extracted via `pdfplumber` and injected into every Claude call as cac
 
 | PDF | What It Contains |
 |---|---|
-| `03-avatar-sheet.pdf` | Target avatar — women 28-42, identity loss, medical dismissal, relationship strain |
-| `04-offer-brief.pdf` | Product details — enzyme-based gummies, Big Idea, UMP/UMS, objection handling |
-| `05-necessary-beliefs.pdf` | 6 beliefs the prospect must hold before buying |
+| `brand/03-avatar-sheet.pdf` | Target avatar — women 28-42, identity loss, medical dismissal, relationship strain |
+| `brand/04-offer-brief.pdf` | Product details — enzyme-based gummies, Big Idea, UMP/UMS, objection handling |
+| `brand/05-necessary-beliefs.pdf` | 6 beliefs the prospect must hold before buying |
 
 Prompt caching (`cache_control: {"type": "ephemeral"}`) saves ~90% on the ~38K chars of brand context that repeats across all API calls.
 
@@ -116,20 +116,30 @@ Prompt caching (`cache_control: {"type": "ephemeral"}`) saves ~90% on the ~38K c
 
 ```
 meta-automation/
-├── pipeline.py              # Main orchestrator — CLI entry point, checkpoint logic
-├── copy_generator.py        # Claude API calls (describe, discover, classify, label, copygen)
-├── image_embedder.py        # CLIP embeddings + agglomerative clustering for visual sub-grouping
-├── video_preprocessor.py    # ffmpeg frame extraction + faster-whisper transcription
-├── meta_uploader.py         # Facebook Marketing API (campaign → ad sets → ads)
-├── brand_context.py         # PDF extraction + system prompt builders (one per pass)
-├── models.py                # Pydantic models for structured output
-├── config.py                # Env vars, paths, model config, feature flags
-├── .env                     # API keys (gitignored)
-├── 03-avatar-sheet.pdf      # Brand docs
-├── 04-offer-brief.pdf
-├── 05-necessary-beliefs.pdf
-├── input_images/            # Drop ad creatives here (.jpg, .png, .webp, .mp4, .mov)
-└── output/                  # Generated artifacts
+├── pipeline/                    # Python package — all pipeline code
+│   ├── __init__.py
+│   ├── run.py                   # Main orchestrator — CLI entry point, checkpoint logic
+│   ├── config.py                # Env vars, paths, model config, feature flags
+│   ├── models.py                # Pydantic models for structured output
+│   ├── brand_context.py         # PDF extraction + system prompt builders (one per pass)
+│   ├── copy_generator.py        # Claude API calls (describe, discover, classify, label, copygen)
+│   ├── image_embedder.py        # CLIP embeddings + agglomerative clustering for visual sub-grouping
+│   ├── video_preprocessor.py    # ffmpeg frame extraction + faster-whisper transcription
+│   └── meta_uploader.py         # Facebook Marketing API (campaign → ad sets → ads)
+├── scripts/                     # Operational scripts
+│   ├── publisher.py             # Publish pipeline output to Supabase for dashboard
+│   ├── metrics_sync.py          # Sync Meta Ads metrics to Supabase
+│   └── report.mjs               # CLI report — pull campaign performance from Meta API
+├── brand/                       # Brand foundation docs
+│   ├── 03-avatar-sheet.pdf
+│   ├── 04-offer-brief.pdf
+│   └── 05-necessary-beliefs.pdf
+├── dashboard/                   # Next.js app (App Router + Tailwind + shadcn/ui)
+│   └── ...
+├── .env                         # API keys (gitignored)
+├── requirements.txt
+├── input_images/                # Drop ad creatives here (.jpg, .png, .webp, .mp4, .mov)
+└── output/                      # Generated artifacts
     ├── descriptions.json        # Pass 1: per-media descriptions
     ├── global_subgroups.json    # Pass 2: CLIP visual sub-groups
     ├── video_categories.json    # Pass 2b: video hook categories
@@ -173,30 +183,35 @@ Drop ad creative images and videos into `input_images/`.
 source venv/bin/activate
 
 # Full pipeline (all passes, resumes from last checkpoint)
-python pipeline.py
+python -m pipeline.run
 
 # Step-by-step (inspect between passes)
-python pipeline.py --preprocess-only   # Pass 0: video frames + transcripts
-python pipeline.py --describe-only     # Pass 0+1: describe all media
-python pipeline.py --subgroup-only     # Pass 0+1+2: visual sub-grouping
-python pipeline.py --discover-only     # Through Pass 3: category discovery
-python pipeline.py --classify-only     # Through Pass 3c: labeling + classification
-python pipeline.py --generate-copy     # Pass 4 only (uses existing checkpoints)
+python -m pipeline.run --preprocess-only   # Pass 0: video frames + transcripts
+python -m pipeline.run --describe-only     # Pass 0+1: describe all media
+python -m pipeline.run --subgroup-only     # Pass 0+1+2: visual sub-grouping
+python -m pipeline.run --discover-only     # Through Pass 3: category discovery
+python -m pipeline.run --classify-only     # Through Pass 3c: labeling + classification
+python -m pipeline.run --generate-copy     # Pass 4 only (uses existing checkpoints)
 
 # Copy mode
-python pipeline.py --subgroup-copy     # Unique copy per sub-group (default: shared per concept)
+python -m pipeline.run --subgroup-copy     # Unique copy per sub-group (default: shared per concept)
 
 # Meta upload
-python pipeline.py --upload            # Full pipeline + upload to Meta
-python pipeline.py --upload-only       # Upload existing output to Meta
+python -m pipeline.run --upload            # Full pipeline + upload to Meta
+python -m pipeline.run --upload-only       # Upload existing output to Meta
 
 # Re-run from scratch
-python pipeline.py --force             # Ignore all checkpoints
+python -m pipeline.run --force             # Ignore all checkpoints
+
+# Operational scripts
+python scripts/publisher.py               # Publish pipeline output to Supabase
+python scripts/metrics_sync.py            # Sync Meta metrics to Supabase
+node scripts/report.mjs                   # Pull campaign performance report
 ```
 
 ## Configuration
 
-Key settings in `config.py` and environment variables:
+Key settings in `pipeline/config.py` and environment variables:
 
 | Setting | Default | Description |
 |---|---|---|
@@ -258,6 +273,6 @@ The current pipeline generates many concepts and uploads them as separate ad set
 
 1. **Test** — Pipeline generates concepts, uploads 1 ad set per concept, runs for ~1 week
 2. **Graduate** — `--graduate` flag (or standalone script) reads performance data from Supabase/Meta, identifies winning ads by custom ROAS/CPA, and creates a new consolidated campaign with 1-2 ad sets containing only proven winners at higher budget
-3. **Iterate** — Next test round feeds winning concept names + performance data back into `brand_context.py` so Claude generates new creative variations that riff on proven angles rather than starting from scratch
+3. **Iterate** — Next test round feeds winning concept names + performance data back into `pipeline/brand_context.py` so Claude generates new creative variations that riff on proven angles rather than starting from scratch
 
 This turns the pipeline from a one-shot generator into a continuous creative optimization loop: test broadly → scale winners → generate new variations of what works → repeat.

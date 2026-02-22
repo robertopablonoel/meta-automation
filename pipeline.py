@@ -16,17 +16,17 @@ Passes 1, 2, 3b, 3c, and 4 run API calls concurrently (controlled by MAX_CONCURR
 Each pass saves intermediate results — re-running skips completed passes automatically.
 
 Usage:
-    python -m pipeline.run                     # Full pipeline (all passes, resumes from last checkpoint)
-    python -m pipeline.run --preprocess-only   # Pass 0 only: extract video frames + transcripts
-    python -m pipeline.run --describe-only     # Pass 0 + 1
-    python -m pipeline.run --subgroup-only     # Pass 0 + 1 + 2 (global visual sub-grouping)
-    python -m pipeline.run --discover-only     # Pass 0 + 1 + 2 + 2b + 3
-    python -m pipeline.run --classify-only     # Pass 0 + 1 + 2 + 2b + 3 + 3b + 3c (everything except copy)
-    python -m pipeline.run --generate-copy     # Pass 4 only (uses existing sub-groups)
-    python -m pipeline.run --subgroup-copy     # Generate unique copy per sub-group (default: per concept)
-    python -m pipeline.run --upload            # Full pipeline + upload to Meta
-    python -m pipeline.run --upload-only       # Upload existing output to Meta
-    python -m pipeline.run --force             # Re-run everything from scratch (ignore checkpoints)
+    python pipeline.py                     # Full pipeline (all passes, resumes from last checkpoint)
+    python pipeline.py --preprocess-only   # Pass 0 only: extract video frames + transcripts
+    python pipeline.py --describe-only     # Pass 0 + 1
+    python pipeline.py --subgroup-only     # Pass 0 + 1 + 2 (global visual sub-grouping)
+    python pipeline.py --discover-only     # Pass 0 + 1 + 2 + 2b + 3
+    python pipeline.py --classify-only     # Pass 0 + 1 + 2 + 2b + 3 + 3b + 3c (everything except copy)
+    python pipeline.py --generate-copy     # Pass 4 only (uses existing sub-groups)
+    python pipeline.py --subgroup-copy     # Generate unique copy per sub-group (default: per concept)
+    python pipeline.py --upload            # Full pipeline + upload to Meta
+    python pipeline.py --upload-only       # Upload existing output to Meta
+    python pipeline.py --force             # Re-run everything from scratch (ignore checkpoints)
 """
 
 import argparse
@@ -35,15 +35,13 @@ import csv
 import json
 import logging
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
 import anthropic
 
-from pipeline.config import (
+from config import (
     ANTHROPIC_API_KEY,
-    BASE_DIR,
     INPUT_DIR,
     OUTPUT_DIR,
     OUTPUT_JSON,
@@ -61,7 +59,7 @@ from pipeline.config import (
     CLIP_MODEL_NAME,
     CLIP_EMBEDDINGS_CACHE_DIR,
 )
-from pipeline.brand_context import (
+from brand_context import (
     load_brand_context,
     build_describe_system,
     build_discover_system,
@@ -71,7 +69,7 @@ from pipeline.brand_context import (
     build_label_subgroup_system,
     build_copygen_system,
 )
-from pipeline.copy_generator import (
+from copy_generator import (
     describe_all_media,
     discover_categories,
     discover_video_categories,
@@ -352,7 +350,7 @@ def run_preprocess_videos(video_paths: list[Path], force: bool = False) -> list[
         logger.info(f"Pass 0: Loaded {len(video_infos)} cached video preprocessed results")
         return video_infos
 
-    from pipeline.video_preprocessor import preprocess_all_videos
+    from video_preprocessor import preprocess_all_videos
 
     logger.info(f"Pass 0: Preprocessing {len(video_paths)} video(s) (frames + transcripts)...")
     video_infos = preprocess_all_videos(video_paths, VIDEO_PREPROCESSED_DIR)
@@ -419,7 +417,7 @@ async def run_global_subgroup(
 
     if USE_CLIP_SUBGROUPING:
         # ── CLIP path: local embeddings + agglomerative clustering ──
-        from pipeline.image_embedder import cluster_images_by_visual_similarity
+        from image_embedder import cluster_images_by_visual_similarity
 
         logger.info(f"Pass 2: CLIP visual sub-grouping of {len(image_paths)} images...")
         clip_results = cluster_images_by_visual_similarity(
@@ -869,8 +867,8 @@ def run_upload(output: dict) -> dict:
     Creates 1 campaign -> 1 ad set/concept -> 1 ad per media item.
     Image ads use AdImage + link_data; video ads use AdVideo + video_data.
     """
-    from pipeline.meta_uploader import upload_to_meta
-    from pipeline.config import META_ACCESS_TOKEN
+    from meta_uploader import upload_to_meta
+    from config import META_ACCESS_TOKEN
 
     if not META_ACCESS_TOKEN:
         logger.error("META_ACCESS_TOKEN not set. Add it to .env and try again.")
@@ -912,8 +910,9 @@ async def async_main(args):
 
     # Publish-only: just push existing data to Supabase
     if args.publish_only:
-        publisher_script = BASE_DIR / "scripts" / "publisher.py"
-        subprocess.run([sys.executable, str(publisher_script)], check=True)
+        from publisher import publish, get_campaign_id
+        campaign_id = get_campaign_id(None)
+        publish(campaign_id)
         return
 
     # Pass 0: preprocess videos (sync, no API client needed)
@@ -921,7 +920,7 @@ async def async_main(args):
         _image_paths, video_paths = _load_media()
         video_infos = run_preprocess_videos(video_paths, force=force)
         print(f"\nPreprocessed {len(video_infos)} video(s). Saved to {VIDEO_PREPROCESSED_JSON}")
-        print("Next step: python -m pipeline.run --describe-only")
+        print("Next step: python pipeline.py --describe-only")
         return
 
     client = _init_client()
@@ -933,7 +932,7 @@ async def async_main(args):
             video_infos = run_preprocess_videos(video_paths, force=force)
             descriptions = await run_describe(client, image_paths, video_infos, force=force)
             print(f"\nDescribed {len(descriptions)} media items. Saved to {DESCRIPTIONS_JSON}")
-            print("Next step: python -m pipeline.run --subgroup-only")
+            print("Next step: python pipeline.py --subgroup-only")
             return
 
         elif args.subgroup_only:
@@ -943,7 +942,7 @@ async def async_main(args):
             global_subgroups = await run_global_subgroup(client, image_paths, descriptions, force=force)
             total_items = sum(len(sg["images"]) for sg in global_subgroups)
             print(f"\nCreated {len(global_subgroups)} global visual sub-groups covering {total_items} images")
-            print("Next step: python -m pipeline.run --discover-only")
+            print("Next step: python pipeline.py --discover-only")
             return
 
         elif args.discover_only:
@@ -956,7 +955,7 @@ async def async_main(args):
             all_cats = list(categories_output["categories"]) + video_categories_output.get("categories", [])
             output = {"categories": all_cats, "concepts": []}
             print(f"\nDiscovered {len(categories_output['categories'])} image + {len(video_categories_output.get('categories', []))} video categories")
-            print("Next step: python -m pipeline.run --classify-only")
+            print("Next step: python pipeline.py --classify-only")
             print_summary(output)
             return
 
@@ -998,7 +997,7 @@ async def async_main(args):
                 ],
             }
             print_summary(output)
-            print("Next step: python -m pipeline.run --generate-copy")
+            print("Next step: python pipeline.py --generate-copy")
             return
 
         elif args.generate_copy:
@@ -1037,8 +1036,9 @@ async def async_main(args):
 
         # Publish to Supabase if requested
         if args.publish:
-            publisher_script = BASE_DIR / "scripts" / "publisher.py"
-            subprocess.run([sys.executable, str(publisher_script)], check=True)
+            from publisher import publish, get_campaign_id
+            campaign_id = get_campaign_id(None)
+            publish(campaign_id)
 
     finally:
         await client.close()

@@ -13,7 +13,7 @@ from facebook_business.adobjects.adcreative import AdCreative
 from facebook_business.adobjects.adimage import AdImage
 from facebook_business.adobjects.advideo import AdVideo
 
-from pipeline.config import (
+from config import (
     META_ACCESS_TOKEN,
     META_APP_ID,
     META_APP_SECRET,
@@ -553,7 +553,7 @@ def upload_to_meta(
 
     # 1c. Upload video thumbnails as images for video_data.image_hash
     logger.info("Step 1c: Uploading video thumbnails...")
-    from pipeline.config import VIDEO_PREPROCESSED_JSON
+    from config import VIDEO_PREPROCESSED_JSON
     video_thumbnail_hashes: dict[str, str] = {}
     if VIDEO_PREPROCESSED_JSON.exists():
         with open(VIDEO_PREPROCESSED_JSON) as f:

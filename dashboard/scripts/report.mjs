@@ -2,10 +2,10 @@
 /**
  * Quick CLI to pull campaign & ad set performance from Meta API.
  * Usage:
- *   node scripts/report.mjs                      # all active campaigns, lifetime
- *   node scripts/report.mjs --days 7             # last 7 days
- *   node scripts/report.mjs --campaign 12345     # specific campaign
- *   node scripts/report.mjs --ads                # include ad-level breakdown
+ *   node dashboard/scripts/report.mjs                      # all active campaigns, lifetime
+ *   node dashboard/scripts/report.mjs --days 7             # last 7 days
+ *   node dashboard/scripts/report.mjs --campaign 12345     # specific campaign
+ *   node dashboard/scripts/report.mjs --ads                # include ad-level breakdown
  */
 
 import { config } from "dotenv";
@@ -13,7 +13,6 @@ import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-config({ path: resolve(__dirname, "../.env") });
 config({ path: resolve(__dirname, "../.env.local") });
 
 const TOKEN = process.env.META_ACCESS_TOKEN;

@@ -7,10 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "report": "node ../scripts/report.mjs",
-    "report:7d": "node ../scripts/report.mjs --days 7",
-    "report:today": "node ../scripts/report.mjs --days 1",
-    "report:ads": "node ../scripts/report.mjs --ads"
+    "report": "node scripts/report.mjs",
+    "report:7d": "node scripts/report.mjs --days 7",
+    "report:today": "node scripts/report.mjs --days 1",
+    "report:ads": "node scripts/report.mjs --ads"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.97.0",

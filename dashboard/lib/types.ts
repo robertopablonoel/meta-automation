@@ -208,6 +208,7 @@ export interface AdRow {
   id: string;
   name: string;
   status: string;
+  adsetId?: string;
   metrics: ComputedMetrics;
   recommendation: Recommendation;
   filename?: string;

@@ -68,12 +68,27 @@ export default function CampaignOverview() {
   // Campaign spend for relative Starving thresholds
   const topLevelCampaignSpend = insights ? computeMetrics(insights).spend : 0;
 
+  // Build set of active ad set IDs for filtering ads by parent status
+  const activeAdsetIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const adset of adsets) {
+      if ((adset.status as string) === "ACTIVE") ids.add(adset.id as string);
+    }
+    return ids;
+  }, [adsets]);
+
+  // Only consider ads in active ad sets for winners/trending
+  const activeAds = useMemo(
+    () => allAds.filter((ad) => activeAdsetIds.has(ad.adset_id as string)),
+    [allAds, activeAdsetIds]
+  );
+
   // Classify all ads into winners/trending
   const { winners, trending } = useMemo(() => {
     const w: WinnerAd[] = [];
     const t: WinnerAd[] = [];
 
-    for (const ad of allAds) {
+    for (const ad of activeAds) {
       const insightsData = (ad.insights as { data: Record<string, unknown>[] })?.data?.[0];
       if (!insightsData) continue;
 
@@ -113,7 +128,7 @@ export default function CampaignOverview() {
     t.sort((a, b) => b.metrics.roas - a.metrics.roas);
 
     return { winners: w, trending: t };
-  }, [allAds, topLevelCampaignSpend]);
+  }, [activeAds, topLevelCampaignSpend]);
 
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange}>
@@ -184,10 +199,25 @@ function OverviewContent({
   const campaignMetrics = insights ? computeMetrics(insights) : null;
   const campaignSpend = campaignMetrics?.spend ?? 0;
 
+  // Build set of active ad set IDs for filtering
+  const activeAdsetIdsInOverview = useMemo(() => {
+    const ids = new Set<string>();
+    for (const adset of adsets) {
+      if ((adset.status as string) === "ACTIVE") ids.add(adset.id as string);
+    }
+    return ids;
+  }, [adsets]);
+
+  // Only consider ads in active ad sets for action summaries
+  const activeAdsInOverview = useMemo(
+    () => allAds.filter((ad) => activeAdsetIdsInOverview.has(ad.adset_id as string)),
+    [allAds, activeAdsetIdsInOverview]
+  );
+
   // Compute per-ad recommendations grouped by adset
   const adActionsByAdset = useMemo(() => {
     const map = new Map<string, AdActionSummary>();
-    for (const ad of allAds) {
+    for (const ad of activeAdsInOverview) {
       const adsetId = ad.adset_id as string;
       if (!adsetId) continue;
       const insightsData = (ad.insights as { data: Record<string, unknown>[] })?.data?.[0];
@@ -201,7 +231,7 @@ function OverviewContent({
       map.set(adsetId, summary);
     }
     return map;
-  }, [allAds, campaignSpend]);
+  }, [activeAdsInOverview, campaignSpend]);
 
   // Build ad set rows with concept metadata
   const conceptMap = new Map(concepts.map((c) => [c.name, c]));
@@ -300,7 +330,7 @@ function OverviewContent({
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
-            Ad Sets ({adsetRows.length})
+            Ad Sets
           </CardTitle>
         </CardHeader>
         <CardContent>

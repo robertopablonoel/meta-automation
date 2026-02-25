@@ -11,6 +11,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { RecommendationBadge } from "./recommendation-badge";
 import { formatCurrency, formatPercent, formatNumber } from "@/lib/utils";
 import { getMetricColor } from "@/lib/benchmarks";
@@ -23,19 +25,32 @@ const stripeClass: Record<string, string> = {
   Starving: "row-stripe-starving",
 };
 
-type SortKey = "name" | "spend" | "impressions" | "cpm" | "ctr" | "cpc" | "cvr" | "cpa" | "roas";
+type SortKey = "name" | "spend" | "impressions" | "cpm" | "ctr" | "cpc" | "cvr" | "cpa" | "roas" | "hookRate" | "holdRate";
 
 interface Props {
   ads: AdRow[];
   campaignId: string;
+  /** When provided, "active" means the ad's parent adset is in this set */
+  activeAdsetIds?: Set<string>;
 }
 
-export function AdTable({ ads, campaignId }: Props) {
+export function AdTable({ ads, campaignId, activeAdsetIds }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("spend");
   const [sortAsc, setSortAsc] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+
+  const filtered = useMemo(() => {
+    if (showAll) return ads;
+    // If we know which ad sets are active, filter by parent adset status
+    // (ads in paused ad sets still report as ACTIVE themselves)
+    if (activeAdsetIds) {
+      return ads.filter((a) => a.adsetId && activeAdsetIds.has(a.adsetId));
+    }
+    return ads.filter((a) => a.status === "ACTIVE");
+  }, [ads, showAll, activeAdsetIds]);
 
   const sorted = useMemo(() => {
-    return [...ads].sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       let aVal: string | number;
       let bVal: string | number;
 
@@ -43,15 +58,15 @@ export function AdTable({ ads, campaignId }: Props) {
         aVal = a.filename || a.name;
         bVal = b.filename || b.name;
       } else {
-        aVal = (a.metrics as unknown as Record<string, number>)[sortKey] ?? 0;
-        bVal = (b.metrics as unknown as Record<string, number>)[sortKey] ?? 0;
+        aVal = (a.metrics as unknown as Record<string, number | null>)[sortKey] ?? 0;
+        bVal = (b.metrics as unknown as Record<string, number | null>)[sortKey] ?? 0;
       }
 
       if (aVal < bVal) return sortAsc ? -1 : 1;
       if (aVal > bVal) return sortAsc ? 1 : -1;
       return 0;
     });
-  }, [ads, sortKey, sortAsc]);
+  }, [filtered, sortKey, sortAsc]);
 
   function handleSort(key: SortKey) {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -71,7 +86,14 @@ export function AdTable({ ads, campaignId }: Props) {
   );
 
   return (
-    <div className="overflow-x-auto">
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5 justify-end">
+        <Switch id="show-all-ads" checked={showAll} onCheckedChange={setShowAll} />
+        <Label htmlFor="show-all-ads" className="text-xs text-muted-foreground cursor-pointer">
+          Show paused
+        </Label>
+      </div>
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40">
@@ -83,6 +105,8 @@ export function AdTable({ ads, campaignId }: Props) {
             <SortHeader label="Impr." sKey="impressions" />
             <SortHeader label="CPM" sKey="cpm" />
             <SortHeader label="CTR" sKey="ctr" />
+            <SortHeader label="Hook" sKey="hookRate" />
+            <SortHeader label="Hold" sKey="holdRate" />
             <SortHeader label="CVR" sKey="cvr" />
             <SortHeader label="CPA" sKey="cpa" />
             <SortHeader label="ROAS" sKey="roas" />
@@ -124,6 +148,12 @@ export function AdTable({ ads, campaignId }: Props) {
               <TableCell className="tabular-nums text-sm">{formatNumber(ad.metrics.impressions)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("cpm", ad.metrics.cpm)}`}>{formatCurrency(ad.metrics.cpm)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("ctr", ad.metrics.ctr)}`}>{formatPercent(ad.metrics.ctr)}</TableCell>
+              <TableCell className="tabular-nums text-sm font-medium">
+                {ad.metrics.hookRate != null ? formatPercent(ad.metrics.hookRate) : "-"}
+              </TableCell>
+              <TableCell className="tabular-nums text-sm font-medium">
+                {ad.metrics.holdRate != null ? formatPercent(ad.metrics.holdRate) : "-"}
+              </TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${getMetricColor("cvr", ad.metrics.cvr)}`}>{formatPercent(ad.metrics.cvr)}</TableCell>
               <TableCell className={`tabular-nums text-sm font-medium ${ad.metrics.cpa > 0 ? getMetricColor("cpa", ad.metrics.cpa) : ""}`}>
                 {ad.metrics.cpa > 0 ? formatCurrency(ad.metrics.cpa) : "-"}
@@ -135,7 +165,7 @@ export function AdTable({ ads, campaignId }: Props) {
           ))}
           {sorted.length === 0 && (
             <TableRow>
-              <TableCell colSpan={11} className="text-center text-muted-foreground py-12">
+              <TableCell colSpan={13} className="text-center text-muted-foreground py-12">
                 <div className="space-y-2">
                   <p className="text-sm font-medium">No ads found</p>
                   <p className="text-xs">Try selecting a different date range</p>
@@ -145,6 +175,7 @@ export function AdTable({ ads, campaignId }: Props) {
           )}
         </TableBody>
       </Table>
+      </div>
     </div>
   );
 }

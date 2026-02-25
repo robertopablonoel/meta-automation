@@ -75,7 +75,7 @@ export default function AdSetDetail() {
     const filename = mapping?.filename || parsed?.filename;
     const mediaType =
       mapping?.media_type ||
-      (filename && /\.(mp4|mov|avi|mkv)$/i.test(filename) ? "video" : "image");
+      (filename && /\.(mp4|mov|avi|mkv)/i.test(filename) ? "video" : "image");
 
     return {
       id: ad.id as string,

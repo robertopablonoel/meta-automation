@@ -16,6 +16,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { formatCurrency, formatPercent, formatNumber } from "@/lib/utils";
 import { getMetricColor } from "@/lib/benchmarks";
 import type { AdSetRow, AdActionSummary } from "@/lib/types";
@@ -87,9 +89,15 @@ interface Props {
 export function AdSetTable({ adsets, campaignId }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("spend");
   const [sortAsc, setSortAsc] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+
+  const filtered = useMemo(() => {
+    if (showAll) return adsets;
+    return adsets.filter((a) => a.status === "ACTIVE");
+  }, [adsets, showAll]);
 
   const sorted = useMemo(() => {
-    return [...adsets].sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       let aVal: string | number;
       let bVal: string | number;
 
@@ -111,7 +119,7 @@ export function AdSetTable({ adsets, campaignId }: Props) {
       if (aVal > bVal) return sortAsc ? 1 : -1;
       return 0;
     });
-  }, [adsets, sortKey, sortAsc]);
+  }, [filtered, sortKey, sortAsc]);
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -132,7 +140,14 @@ export function AdSetTable({ adsets, campaignId }: Props) {
   );
 
   return (
-    <div className="overflow-x-auto">
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5 justify-end">
+        <Switch id="show-all-adsets" checked={showAll} onCheckedChange={setShowAll} />
+        <Label htmlFor="show-all-adsets" className="text-xs text-muted-foreground cursor-pointer">
+          Show paused
+        </Label>
+      </div>
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40">
@@ -225,6 +240,7 @@ export function AdSetTable({ adsets, campaignId }: Props) {
           )}
         </TableBody>
       </Table>
+      </div>
     </div>
   );
 }

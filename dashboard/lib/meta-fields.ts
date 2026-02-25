@@ -65,7 +65,8 @@ export function parseAdName(adName: string): {
 } | null {
   // Ad names follow pattern: "concept/sub_group/filename"
   // Or with prefix: "Ad - concept/sub_group/filename"
-  const cleaned = adName.replace(/^Ad\s*-\s*/, "");
+  // Strip "- Copy" suffix added by Meta Ads Manager duplication
+  const cleaned = adName.replace(/^Ad\s*-\s*/, "").replace(/\s*-\s*Copy\s*$/, "");
   const parts = cleaned.split("/");
   if (parts.length < 3) return null;
   return {

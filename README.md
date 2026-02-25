@@ -116,20 +116,27 @@ Prompt caching (`cache_control: {"type": "ephemeral"}`) saves ~90% on the ~38K c
 
 ```
 meta-automation/
-├── pipeline.py              # Main orchestrator — CLI entry point, checkpoint logic
-├── copy_generator.py        # Claude API calls (describe, discover, classify, label, copygen)
-├── image_embedder.py        # CLIP embeddings + agglomerative clustering for visual sub-grouping
-├── video_preprocessor.py    # ffmpeg frame extraction + faster-whisper transcription
-├── meta_uploader.py         # Facebook Marketing API (campaign → ad sets → ads)
-├── brand_context.py         # PDF extraction + system prompt builders (one per pass)
-├── models.py                # Pydantic models for structured output
-├── config.py                # Env vars, paths, model config, feature flags
-├── .env                     # API keys (gitignored)
-├── 03-avatar-sheet.pdf      # Brand docs
-├── 04-offer-brief.pdf
-├── 05-necessary-beliefs.pdf
-├── input_images/            # Drop ad creatives here (.jpg, .png, .webp, .mp4, .mov)
-└── output/                  # Generated artifacts
+├── pipeline/                    # Python package
+│   ├── __init__.py
+│   ├── run.py                   # Main orchestrator — CLI entry point, checkpoint logic
+│   ├── config.py                # Env vars, paths, model config, feature flags
+│   ├── models.py                # Pydantic models for structured output
+│   ├── copy_generator.py        # Claude API calls (describe, discover, classify, label, copygen)
+│   ├── brand_context.py         # PDF extraction + system prompt builders (one per pass)
+│   ├── image_embedder.py        # CLIP embeddings + agglomerative clustering for visual sub-grouping
+│   ├── video_preprocessor.py    # ffmpeg frame extraction + faster-whisper transcription
+│   ├── meta_uploader.py         # Facebook Marketing API (campaign → ad sets → ads)
+│   └── publisher.py             # Publish pipeline output to Supabase for dashboard
+├── scripts/
+│   └── metrics_sync.py          # Sync Meta Ads metrics to Supabase (standalone)
+├── brand/
+│   ├── 03-avatar-sheet.pdf      # Brand docs
+│   ├── 04-offer-brief.pdf
+│   └── 05-necessary-beliefs.pdf
+├── dashboard/                   # Next.js dashboard app
+├── .env                         # API keys (gitignored)
+├── input_images/                # Drop ad creatives here (.jpg, .png, .webp, .mp4, .mov)
+└── output/                      # Generated artifacts
     ├── descriptions.json        # Pass 1: per-media descriptions
     ├── global_subgroups.json    # Pass 2: CLIP visual sub-groups
     ├── video_categories.json    # Pass 2b: video hook categories
@@ -173,25 +180,25 @@ Drop ad creative images and videos into `input_images/`.
 source venv/bin/activate
 
 # Full pipeline (all passes, resumes from last checkpoint)
-python pipeline.py
+python -m pipeline.run
 
 # Step-by-step (inspect between passes)
-python pipeline.py --preprocess-only   # Pass 0: video frames + transcripts
-python pipeline.py --describe-only     # Pass 0+1: describe all media
-python pipeline.py --subgroup-only     # Pass 0+1+2: visual sub-grouping
-python pipeline.py --discover-only     # Through Pass 3: category discovery
-python pipeline.py --classify-only     # Through Pass 3c: labeling + classification
-python pipeline.py --generate-copy     # Pass 4 only (uses existing checkpoints)
+python -m pipeline.run --preprocess-only   # Pass 0: video frames + transcripts
+python -m pipeline.run --describe-only     # Pass 0+1: describe all media
+python -m pipeline.run --subgroup-only     # Pass 0+1+2: visual sub-grouping
+python -m pipeline.run --discover-only     # Through Pass 3: category discovery
+python -m pipeline.run --classify-only     # Through Pass 3c: labeling + classification
+python -m pipeline.run --generate-copy     # Pass 4 only (uses existing checkpoints)
 
 # Copy mode
-python pipeline.py --subgroup-copy     # Unique copy per sub-group (default: shared per concept)
+python -m pipeline.run --subgroup-copy     # Unique copy per sub-group (default: shared per concept)
 
 # Meta upload
-python pipeline.py --upload            # Full pipeline + upload to Meta
-python pipeline.py --upload-only       # Upload existing output to Meta
+python -m pipeline.run --upload            # Full pipeline + upload to Meta
+python -m pipeline.run --upload-only       # Upload existing output to Meta
 
 # Re-run from scratch
-python pipeline.py --force             # Ignore all checkpoints
+python -m pipeline.run --force             # Ignore all checkpoints
 ```
 
 ## Configuration

@@ -7,8 +7,8 @@ from pathlib import Path
 
 import anthropic
 
-from config import MODEL_NAME, VARIATIONS_PER_CONCEPT, MAX_CONCURRENT
-from models import (
+from .config import MODEL_NAME, VARIATIONS_PER_CONCEPT, MAX_CONCURRENT
+from .models import (
     ImageDescription,
     CategoryDiscoveryResult,
     ImageClassification,

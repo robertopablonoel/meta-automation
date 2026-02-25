@@ -4,8 +4,8 @@ CLIP-based image embedding and clustering for visual sub-grouping.
 Replaces the Claude vision sub-grouping pass with local CLIP embeddings
 + agglomerative clustering. Zero API calls, runs in ~30-50s for ~164 images.
 
-Usage (called from pipeline.py):
-    from image_embedder import cluster_images_by_visual_similarity
+Usage (called from pipeline.run):
+    from pipeline.image_embedder import cluster_images_by_visual_similarity
     subgroups = cluster_images_by_visual_similarity(image_paths, descriptions, ...)
 """
 

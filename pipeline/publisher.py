@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from config import OUTPUT_DIR
+from .config import OUTPUT_DIR
 
 logging.basicConfig(
     level=logging.INFO,

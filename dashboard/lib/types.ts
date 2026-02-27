@@ -28,6 +28,15 @@ export interface MetaInsights {
 export interface MetaAction {
   action_type: string;
   value: string;
+  "1d_click"?: string;
+  "7d_click"?: string;
+  "1d_view"?: string;
+}
+
+export interface AttributionBreakdown {
+  click: number;    // 7d_click value
+  view: number;     // 1d_view value
+  total: number;    // value (combined)
 }
 
 export interface MetaAdSet {
@@ -76,6 +85,11 @@ export interface ComputedMetrics {
   // Video raw
   video3sViews: number;
   videoP50Views: number;
+  // Attribution breakdown
+  purchaseAttribution: AttributionBreakdown;
+  revenueAttribution: AttributionBreakdown;
+  roasClick: number;
+  cpaClick: number;
 }
 
 // ── Confidence ──

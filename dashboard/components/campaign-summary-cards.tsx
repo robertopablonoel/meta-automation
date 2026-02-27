@@ -35,13 +35,13 @@ export function CampaignSummaryCards({ metrics }: Props) {
     {
       title: "Purchases",
       value: formatNumber(metrics.purchases),
-      sub: `${formatNumber(metrics.addToCart)} add to cart`,
+      sub: `${formatNumber(metrics.purchaseAttribution.click)} click / ${formatNumber(metrics.purchaseAttribution.view)} view`,
       tint: metrics.purchases > 0 ? "good" : "neutral",
     },
     {
       title: "ROAS",
       value: `${metrics.roas.toFixed(2)}x`,
-      sub: `${formatCurrency(metrics.purchaseValue)} revenue`,
+      sub: `${metrics.roasClick.toFixed(2)}x click-only`,
       tint: roasTint(metrics.roas),
     },
     {

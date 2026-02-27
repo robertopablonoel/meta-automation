@@ -1,4 +1,4 @@
-import type { MetaAction } from "./types";
+import type { MetaAction, AttributionBreakdown } from "./types";
 
 // Custom conversion IDs for Spicy Cubes / Pineapple
 const CUSTOM_PURCHASE_ID = "866343756407498"; // "Purchase | All Pineapple"
@@ -21,6 +21,8 @@ export const INSIGHTS_FIELDS = [
   "video_p50_watched_actions",
   "video_p75_watched_actions",
 ].join(",");
+
+export const ACTION_ATTRIBUTION_WINDOWS = '["1d_click","7d_click","1d_view"]';
 
 export const CAMPAIGN_FIELDS = "name,status,created_time";
 export const ADSET_FIELDS = "name,status,campaign_id";
@@ -55,6 +57,21 @@ export function extractPurchaseValue(
   actions: MetaAction[] | undefined
 ): number {
   return extractAction(actions, ACTION_TYPES.purchase);
+}
+
+// Extract action value broken down by attribution window
+export function extractActionByWindow(
+  actions: MetaAction[] | undefined,
+  actionType: string
+): AttributionBreakdown {
+  if (!actions) return { click: 0, view: 0, total: 0 };
+  const action = actions.find((a) => a.action_type === actionType);
+  if (!action) return { click: 0, view: 0, total: 0 };
+  return {
+    click: parseFloat(action["7d_click"] ?? "0"),
+    view: parseFloat(action["1d_view"] ?? "0"),
+    total: parseFloat(action.value),
+  };
 }
 
 // Parse ad name → { concept, subGroup, filename }

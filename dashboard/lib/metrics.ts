@@ -1,5 +1,5 @@
 import type { ComputedMetrics } from "./types";
-import { extractAction, ACTION_TYPES } from "./meta-fields";
+import { extractAction, extractActionByWindow, ACTION_TYPES } from "./meta-fields";
 
 export function computeMetrics(
   raw: Record<string, unknown>
@@ -26,6 +26,10 @@ export function computeMetrics(
   // Revenue: custom conversion only
   const purchaseValue = extractCustomRevenue(actionValues);
 
+  // Attribution breakdown
+  const purchaseAttribution = extractActionByWindow(actions, ACTION_TYPES.purchase);
+  const revenueAttribution = extractActionByWindow(actionValues, ACTION_TYPES.purchase);
+
   const video3sViews = extractAction(actions, ACTION_TYPES.video3sView);
   const videoP50 = extractVideoMetric(raw.video_p50_watched_actions);
 
@@ -47,6 +51,8 @@ export function computeMetrics(
   const aov = purchases > 0 ? purchaseValue / purchases : 0;
   const cpa = purchases > 0 ? spend / purchases : 0;
   const roas = spend > 0 ? purchaseValue / spend : 0;
+  const roasClick = spend > 0 ? revenueAttribution.click / spend : 0;
+  const cpaClick = purchaseAttribution.click > 0 ? spend / purchaseAttribution.click : 0;
 
   return {
     impressions,
@@ -71,6 +77,10 @@ export function computeMetrics(
     roas,
     video3sViews,
     videoP50Views: videoP50,
+    purchaseAttribution,
+    revenueAttribution,
+    roasClick,
+    cpaClick,
   };
 }
 

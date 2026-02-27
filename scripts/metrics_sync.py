@@ -12,6 +12,7 @@ Usage:
 """
 
 import argparse
+import json
 import logging
 import os
 import sys
@@ -47,6 +48,8 @@ INSIGHTS_FIELDS = ",".join([
 ])
 ADSET_FIELDS = "name,status,campaign_id"
 AD_FIELDS = "name,status,adset_id,creative{id}"
+
+ACTION_ATTRIBUTION_WINDOWS = json.dumps(["1d_click", "7d_click", "1d_view"])
 
 # Rate limiting
 BATCH_SLEEP_SECONDS = 2
@@ -84,7 +87,7 @@ def list_campaigns() -> list[dict]:
 
 
 def get_campaign_insights(campaign_id: str) -> dict | None:
-    url = f"{BASE_URL}/{campaign_id}/insights?fields={INSIGHTS_FIELDS}&date_preset=maximum&access_token={META_ACCESS_TOKEN}"
+    url = f"{BASE_URL}/{campaign_id}/insights?fields={INSIGHTS_FIELDS}&date_preset=maximum&action_attribution_windows={ACTION_ATTRIBUTION_WINDOWS}&access_token={META_ACCESS_TOKEN}"
     data = meta_fetch(url)
     items = data.get("data", [])
     return items[0] if items else None
@@ -95,18 +98,19 @@ def get_daily_insights(entity_id: str) -> list[dict]:
     url = (f"{BASE_URL}/{entity_id}/insights"
            f"?fields={INSIGHTS_FIELDS}"
            f"&time_increment=1&date_preset=last_30d"
+           f"&action_attribution_windows={ACTION_ATTRIBUTION_WINDOWS}"
            f"&access_token={META_ACCESS_TOKEN}")
     data = meta_fetch(url)
     return data.get("data", [])
 
 
 def get_adsets(campaign_id: str) -> list[dict]:
-    url = f"{BASE_URL}/{campaign_id}/adsets?fields={ADSET_FIELDS},insights.fields({INSIGHTS_FIELDS}).date_preset(maximum)&limit=100&access_token={META_ACCESS_TOKEN}"
+    url = f"{BASE_URL}/{campaign_id}/adsets?fields={ADSET_FIELDS},insights.fields({INSIGHTS_FIELDS}).date_preset(maximum).action_attribution_windows({ACTION_ATTRIBUTION_WINDOWS})&limit=100&access_token={META_ACCESS_TOKEN}"
     return meta_fetch_all(url)
 
 
 def get_ads(adset_id: str) -> list[dict]:
-    url = f"{BASE_URL}/{adset_id}/ads?fields={AD_FIELDS},insights.fields({INSIGHTS_FIELDS}).date_preset(maximum)&limit=200&access_token={META_ACCESS_TOKEN}"
+    url = f"{BASE_URL}/{adset_id}/ads?fields={AD_FIELDS},insights.fields({INSIGHTS_FIELDS}).date_preset(maximum).action_attribution_windows({ACTION_ATTRIBUTION_WINDOWS})&limit=200&access_token={META_ACCESS_TOKEN}"
     return meta_fetch_all(url)
 
 

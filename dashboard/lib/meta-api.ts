@@ -4,6 +4,7 @@ import {
   CAMPAIGN_FIELDS,
   ADSET_FIELDS,
   AD_FIELDS,
+  ACTION_ATTRIBUTION_WINDOWS,
 } from "./meta-fields";
 import type { DateRange } from "./types";
 
@@ -49,7 +50,7 @@ export async function getCampaignInsights(
   campaignId: string,
   dateRange?: DateRange
 ) {
-  let url = `${baseUrl}/${campaignId}/insights?fields=${INSIGHTS_FIELDS}&access_token=${accessToken}`;
+  let url = `${baseUrl}/${campaignId}/insights?fields=${INSIGHTS_FIELDS}&action_attribution_windows=${ACTION_ATTRIBUTION_WINDOWS}&access_token=${accessToken}`;
   if (dateRange) {
     url += `&time_range=${JSON.stringify({
       since: dateRange.since,
@@ -64,49 +65,49 @@ export async function getAdSetInsights(
   campaignId: string,
   dateRange?: DateRange
 ) {
-  let url = `${baseUrl}/${campaignId}/adsets?fields=${ADSET_FIELDS},insights.fields(${INSIGHTS_FIELDS})&limit=100&access_token=${accessToken}`;
+  let url = `${baseUrl}/${campaignId}/adsets?fields=${ADSET_FIELDS},insights.fields(${INSIGHTS_FIELDS}).action_attribution_windows(${ACTION_ATTRIBUTION_WINDOWS})&limit=100&access_token=${accessToken}`;
   if (dateRange) {
     const timeRange = JSON.stringify({
       since: dateRange.since,
       until: dateRange.until,
     });
-    url = `${baseUrl}/${campaignId}/adsets?fields=${ADSET_FIELDS},insights.fields(${INSIGHTS_FIELDS}).time_range(${timeRange})&limit=100&access_token=${accessToken}`;
+    url = `${baseUrl}/${campaignId}/adsets?fields=${ADSET_FIELDS},insights.fields(${INSIGHTS_FIELDS}).time_range(${timeRange}).action_attribution_windows(${ACTION_ATTRIBUTION_WINDOWS})&limit=100&access_token=${accessToken}`;
   }
   return metaFetchAll<Record<string, unknown>>(url);
 }
 
 export async function getAdInsights(adSetId: string, dateRange?: DateRange) {
-  let url = `${baseUrl}/${adSetId}/ads?fields=${AD_FIELDS},insights.fields(${INSIGHTS_FIELDS})&limit=200&access_token=${accessToken}`;
+  let url = `${baseUrl}/${adSetId}/ads?fields=${AD_FIELDS},insights.fields(${INSIGHTS_FIELDS}).action_attribution_windows(${ACTION_ATTRIBUTION_WINDOWS})&limit=200&access_token=${accessToken}`;
   if (dateRange) {
     const timeRange = JSON.stringify({
       since: dateRange.since,
       until: dateRange.until,
     });
-    url = `${baseUrl}/${adSetId}/ads?fields=${AD_FIELDS},insights.fields(${INSIGHTS_FIELDS}).time_range(${timeRange})&limit=200&access_token=${accessToken}`;
+    url = `${baseUrl}/${adSetId}/ads?fields=${AD_FIELDS},insights.fields(${INSIGHTS_FIELDS}).time_range(${timeRange}).action_attribution_windows(${ACTION_ATTRIBUTION_WINDOWS})&limit=200&access_token=${accessToken}`;
   }
   return metaFetchAll<Record<string, unknown>>(url);
 }
 
 export async function getSingleAdInsights(adId: string, dateRange?: DateRange) {
-  let url = `${baseUrl}/${adId}?fields=${AD_FIELDS},insights.fields(${INSIGHTS_FIELDS})&access_token=${accessToken}`;
+  let url = `${baseUrl}/${adId}?fields=${AD_FIELDS},insights.fields(${INSIGHTS_FIELDS}).action_attribution_windows(${ACTION_ATTRIBUTION_WINDOWS})&access_token=${accessToken}`;
   if (dateRange) {
     const timeRange = JSON.stringify({
       since: dateRange.since,
       until: dateRange.until,
     });
-    url = `${baseUrl}/${adId}?fields=${AD_FIELDS},insights.fields(${INSIGHTS_FIELDS}).time_range(${timeRange})&access_token=${accessToken}`;
+    url = `${baseUrl}/${adId}?fields=${AD_FIELDS},insights.fields(${INSIGHTS_FIELDS}).time_range(${timeRange}).action_attribution_windows(${ACTION_ATTRIBUTION_WINDOWS})&access_token=${accessToken}`;
   }
   return metaFetch<Record<string, unknown>>(url);
 }
 
 export async function getCampaignAds(campaignId: string, dateRange?: DateRange) {
-  let url = `${baseUrl}/${campaignId}/ads?fields=${AD_FIELDS},insights.fields(${INSIGHTS_FIELDS})&limit=200&access_token=${accessToken}`;
+  let url = `${baseUrl}/${campaignId}/ads?fields=${AD_FIELDS},insights.fields(${INSIGHTS_FIELDS}).action_attribution_windows(${ACTION_ATTRIBUTION_WINDOWS})&limit=200&access_token=${accessToken}`;
   if (dateRange) {
     const timeRange = JSON.stringify({
       since: dateRange.since,
       until: dateRange.until,
     });
-    url = `${baseUrl}/${campaignId}/ads?fields=${AD_FIELDS},insights.fields(${INSIGHTS_FIELDS}).time_range(${timeRange})&limit=200&access_token=${accessToken}`;
+    url = `${baseUrl}/${campaignId}/ads?fields=${AD_FIELDS},insights.fields(${INSIGHTS_FIELDS}).time_range(${timeRange}).action_attribution_windows(${ACTION_ATTRIBUTION_WINDOWS})&limit=200&access_token=${accessToken}`;
   }
   return metaFetchAll<Record<string, unknown>>(url);
 }

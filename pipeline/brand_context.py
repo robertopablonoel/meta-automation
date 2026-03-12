@@ -1,6 +1,9 @@
 import pdfplumber
 
-from .config import AVATAR_SHEET_PDF, OFFER_BRIEF_PDF, NECESSARY_BELIEFS_PDF
+from .config import (
+    AVATAR_SHEET_PDF, OFFER_BRIEF_PDF, NECESSARY_BELIEFS_PDF,
+    AVATAR_SHEET_ES, OFFER_BRIEF_ES, NECESSARY_BELIEFS_ES,
+)
 
 
 def extract_pdf_text(pdf_path: str) -> str:
@@ -14,11 +17,20 @@ def extract_pdf_text(pdf_path: str) -> str:
     return "\n\n".join(pages)
 
 
-def load_brand_context() -> str:
-    """Load and concatenate all brand doc PDFs into a single text block."""
-    avatar_text = extract_pdf_text(str(AVATAR_SHEET_PDF))
-    offer_text = extract_pdf_text(str(OFFER_BRIEF_PDF))
-    beliefs_text = extract_pdf_text(str(NECESSARY_BELIEFS_PDF))
+def load_brand_context(language: str = "en") -> str:
+    """Load and concatenate all brand docs into a single text block.
+
+    Args:
+        language: "en" loads from English PDFs, "es" loads from Spanish .txt files.
+    """
+    if language == "es":
+        avatar_text = AVATAR_SHEET_ES.read_text(encoding="utf-8")
+        offer_text = OFFER_BRIEF_ES.read_text(encoding="utf-8")
+        beliefs_text = NECESSARY_BELIEFS_ES.read_text(encoding="utf-8")
+    else:
+        avatar_text = extract_pdf_text(str(AVATAR_SHEET_PDF))
+        offer_text = extract_pdf_text(str(OFFER_BRIEF_PDF))
+        beliefs_text = extract_pdf_text(str(NECESSARY_BELIEFS_PDF))
 
     return (
         "=== AVATAR SHEET ===\n\n"
@@ -39,14 +51,27 @@ def _brand_context_block(brand_context: str) -> dict:
     }
 
 
+def _language_directive(language: str) -> str:
+    """Return a language directive block for non-English languages, or empty string."""
+    if language == "es":
+        return (
+            "\n\n## LANGUAGE\n"
+            "Write ALL output text in Spanish (Latin American). "
+            "Use natural, conversational Latin American Spanish — not literal translations from English. "
+            "Keep the brand name 'Spicy Cubes Dailies' untranslated."
+        )
+    return ""
+
+
 # ── Pass 1: Describe ──────────────────────────────────────────────────────
 
-def build_describe_system(brand_context: str) -> list[dict]:
+def build_describe_system(brand_context: str, language: str = "en") -> list[dict]:
     """System prompt for Pass 1: image description."""
+    lang_block = _language_directive(language)
     return [
         {
             "type": "text",
-            "text": """\
+            "text": f"""\
 You are an expert direct-response advertising analyst working for Spicy Cubes Dailies, an enzyme-based gummy supplement for women's desire, energy, and mood.
 
 ## YOUR TASK
@@ -63,7 +88,7 @@ Be precise and analytical:
 - **target_awareness_level**: Using Eugene Schwartz's awareness spectrum, where does this creative meet the prospect? (unaware, problem-aware, solution-aware, product-aware, most-aware)
 - **transcript_summary**: (Videos only) Summarize the key message and selling points from the audio transcript in 1-2 sentences. Leave empty for images.
 
-Think like a media buyer analyzing creatives for pattern recognition.""",
+Think like a media buyer analyzing creatives for pattern recognition.{lang_block}""",
             "cache_control": {"type": "ephemeral"},
         },
         _brand_context_block(brand_context),
@@ -72,12 +97,13 @@ Think like a media buyer analyzing creatives for pattern recognition.""",
 
 # ── Pass 2: Discover Categories ───────────────────────────────────────────
 
-def build_discover_system(brand_context: str) -> list[dict]:
+def build_discover_system(brand_context: str, language: str = "en") -> list[dict]:
     """System prompt for Pass 2: category discovery from image descriptions."""
+    lang_block = _language_directive(language)
     return [
         {
             "type": "text",
-            "text": """\
+            "text": f"""\
 You are a world-class direct-response strategist channeling Eugene Schwartz's Breakthrough Advertising methodology. You work for Spicy Cubes Dailies, an enzyme-based gummy supplement for women's desire, energy, and mood.
 
 ## YOUR TASK
@@ -116,7 +142,7 @@ Provide your reasoning for how you arrived at the categories, then list each cat
 - A description of what unifies creatives in this category
 - Which Schwartz sophistication stage it targets
 - Which Necessary Belief(s) it builds
-- Which images from the batch belong here""",
+- Which images from the batch belong here{lang_block}""",
             "cache_control": {"type": "ephemeral"},
         },
         _brand_context_block(brand_context),
@@ -125,12 +151,13 @@ Provide your reasoning for how you arrived at the categories, then list each cat
 
 # ── Pass 2b: Discover Video Hook Categories ──────────────────────────────
 
-def build_discover_video_system(brand_context: str) -> list[dict]:
+def build_discover_video_system(brand_context: str, language: str = "en") -> list[dict]:
     """System prompt for Pass 2b: discover video hook categories from video descriptions."""
+    lang_block = _language_directive(language)
     return [
         {
             "type": "text",
-            "text": """\
+            "text": f"""\
 You are a world-class direct-response strategist and UGC video analyst for Spicy Cubes Dailies, an enzyme-based gummy supplement for women's desire, energy, and mood.
 
 ## YOUR TASK
@@ -146,7 +173,7 @@ Given text descriptions of UGC video ad creatives (including their opening hook 
 2. Categories should be MECE for this batch of videos
 3. Aim for 2-5 categories (fewer videos = fewer categories)
 4. Name categories with descriptive snake_case slugs that reflect the hook angle
-5. Map each category to the Necessary Belief it targets and Schwartz awareness level it enters at""",
+5. Map each category to the Necessary Belief it targets and Schwartz awareness level it enters at{lang_block}""",
             "cache_control": {"type": "ephemeral"},
         },
         _brand_context_block(brand_context),
@@ -155,17 +182,19 @@ Given text descriptions of UGC video ad creatives (including their opening hook 
 
 # ── Pass 3: Classify ──────────────────────────────────────────────────────
 
-def build_classify_system(brand_context: str, categories: list[dict]) -> list[dict]:
+def build_classify_system(brand_context: str, categories: list[dict], language: str = "en") -> list[dict]:
     """System prompt for Pass 3: classify images into discovered categories.
 
     Args:
         brand_context: Full brand context text.
         categories: List of discovered category dicts with 'name', 'display_name', 'description'.
+        language: Pipeline language code.
     """
     category_list = "\n".join(
         f"- **{cat['name']}** ({cat['display_name']}): {cat['description']}"
         for cat in categories
     )
+    lang_block = _language_directive(language)
 
     return [
         {
@@ -190,7 +219,7 @@ Use the brand's foundational documents (Avatar Sheet, Offer Brief, Necessary Bel
 ## RULES
 - Choose the single BEST category for each image
 - Provide clear reasoning that references which belief, avatar pain point, or offer angle drove your decision
-- If an image could fit multiple categories, choose the one that best represents the image's PRIMARY strategic intent""",
+- If an image could fit multiple categories, choose the one that best represents the image's PRIMARY strategic intent{lang_block}""",
             "cache_control": {"type": "ephemeral"},
         },
         _brand_context_block(brand_context),
@@ -202,7 +231,7 @@ Use the brand's foundational documents (Avatar Sheet, Offer Brief, Necessary Bel
 def build_subgroup_system() -> list[dict]:
     """System prompt for Pass 3b: visual sub-grouping within a concept.
 
-    No brand context needed — this is purely visual analysis.
+    No brand context or language needed — this is purely visual analysis.
     """
     return [
         {
@@ -236,12 +265,13 @@ Cluster images based on these visual attributes — NOT by message, copy, or str
 
 # ── Pass 3b: Label Sub-groups with Strategic Concepts ────────────────────
 
-def build_label_subgroup_system(brand_context: str, categories: list[dict]) -> list[dict]:
+def build_label_subgroup_system(brand_context: str, categories: list[dict], language: str = "en") -> list[dict]:
     """System prompt for labeling visual sub-groups with strategic concept categories."""
     category_list = "\n".join(
         f"- **{cat['name']}** ({cat['display_name']}): {cat['description']}"
         for cat in categories
     )
+    lang_block = _language_directive(language)
 
     return [
         {
@@ -267,7 +297,7 @@ Use the brand's foundational documents (Avatar Sheet, Offer Brief, Necessary Bel
 - Choose the single BEST category for the entire sub-group
 - All images in the sub-group get the same label
 - If images could fit multiple categories, choose the one that best represents their PRIMARY strategic intent
-- Provide clear reasoning that references which belief, avatar pain point, or offer angle drove your decision""",
+- Provide clear reasoning that references which belief, avatar pain point, or offer angle drove your decision{lang_block}""",
             "cache_control": {"type": "ephemeral"},
         },
         _brand_context_block(brand_context),
@@ -276,12 +306,13 @@ Use the brand's foundational documents (Avatar Sheet, Offer Brief, Necessary Bel
 
 # ── Pass 4: Copy Generation ──────────────────────────────────────────────
 
-def build_copygen_system(brand_context: str, categories: list[dict]) -> list[dict]:
+def build_copygen_system(brand_context: str, categories: list[dict], language: str = "en") -> list[dict]:
     """System prompt for Pass 4: generate copy per concept group.
 
     Args:
         brand_context: Full brand context text.
         categories: List of discovered category dicts.
+        language: Pipeline language code.
     """
     category_context = "\n\n".join(
         f"### {cat['display_name']} (`{cat['name']}`)\n"
@@ -291,15 +322,23 @@ def build_copygen_system(brand_context: str, categories: list[dict]) -> list[dic
         for cat in categories
     )
 
-    return [
-        {
-            "type": "text",
-            "text": f"""\
-You are an expert direct-response copywriter for Spicy Cubes Dailies, an enzyme-based gummy supplement for women's desire, energy, and mood.
+    if language == "es":
+        copy_rules = """\
+## COPY RULES
+- **Primary Text**: 2-4 sentences. Direct response style. Lead with a hook that stops the scroll. Use the avatar's real language — raw, relatable, conversational Latin American Spanish. Must build the belief mapped to the creative concept. End with a soft CTA or curiosity gap.
+- **Headline**: Under 40 characters. MUST be a clear BENEFIT statement — what the product does for her. Think product tagline, not story hook. Examples: "Vuelve a Sentirte Tú", "Enzimas, No Probióticos", "Balance Diario Sin Hinchazón", "Balance Femenino, Hecho Mejor", "Dosis Clínicas, Balance Real". Do NOT write story hooks, emotional statements, or narrative lines as headlines.
+- **Description**: 40-80 characters. MUST contain social proof, offer details, or guarantee info. Combine 2-3 of: star rating, review count, money-back guarantee, free shipping, cancel anytime, clinical doses, timeline of results. Examples: "5 ingredientes clínicos. Una gomita al día. Envío gratis.", "A base de enzimas. Sin probióticos. Sin hinchazón. Garantía 90 días.", "Garantía 90 días. Envío gratis. Cancela cuando quieras.", "4.8 estrellas. 350+ reseñas. La gomita que todas quieren.", "Menos hinchazón semana 1. Mejor ánimo semana 4. Una gomita." Do NOT write vague or emotional descriptions.
 
-## CREATIVE CONCEPT CATEGORIES (Discovered for This Batch)
-{category_context}
-
+## COPY STYLE GUIDELINES
+- Escribe como una mujer hablándole a su mejor amiga, no como una marca hablándole a una clienta
+- Usa el lenguaje real del avatar: "Ya no me reconozco," "tal vez así soy ahora," "amiga, igual yo"
+- Referencia puntos de dolor específicos: los probióticos que la hinchaban, los doctores que la ignoraron, la culpa de evitar el contacto con su pareja
+- Siempre diferencia: enzimas no probióticos, dosis clínicas no polvos mágicos, gomita grande no empaque bonito
+- Incluye detalles específicos cuando sea relevante: 600mg fenogreco, 500mg tribulus, 30mg azafrán, 120mg bromelina
+- Nunca seas moralista ni clínica. Sé honesta, cruda y da permiso.
+- Varía el ángulo emocional entre variaciones: mezcla hooks, tonos y ángulos de creencia dentro del concepto asignado"""
+    else:
+        copy_rules = """\
 ## COPY RULES
 - **Primary Text**: 2-4 sentences. Direct response style. Lead with a hook that stops the scroll. Use the avatar's real language (Reddit-native, raw, relatable). Must build the belief mapped to the creative concept. End with a soft CTA or curiosity gap.
 - **Headline**: Under 40 characters. MUST be a clear BENEFIT statement — what the product does for her. Think product tagline, not story hook. Examples: "Feel Like Yourself Again", "Enzymes, Not Probiotics", "Daily Balance Without the Bloat", "Feminine Balance, Done Better", "Clinical Doses, Real Balance". Do NOT write story hooks, emotional statements, or narrative lines as headlines.
@@ -312,7 +351,18 @@ You are an expert direct-response copywriter for Spicy Cubes Dailies, an enzyme-
 - Always differentiate: enzymes not probiotics, clinical doses not fairy dust, oversized gummy not cute packaging
 - Include specific details when relevant: 600mg fenugreek, 500mg tribulus, 30mg saffron, 120mg bromelain
 - Never be preachy or clinical. Be honest, raw, and permission-giving.
-- Vary the emotional angle across variations: mix hooks, tones, and belief angles within the assigned concept""",
+- Vary the emotional angle across variations: mix hooks, tones, and belief angles within the assigned concept"""
+
+    return [
+        {
+            "type": "text",
+            "text": f"""\
+You are an expert direct-response copywriter for Spicy Cubes Dailies, an enzyme-based gummy supplement for women's desire, energy, and mood.
+
+## CREATIVE CONCEPT CATEGORIES (Discovered for This Batch)
+{category_context}
+
+{copy_rules}""",
             "cache_control": {"type": "ephemeral"},
         },
         _brand_context_block(brand_context),

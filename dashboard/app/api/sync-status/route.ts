@@ -36,8 +36,8 @@ export async function GET() {
 
 export async function POST() {
   try {
-    // Use relative path from dashboard/ to avoid Turbopack resolving the symlink
-    const cmd = "cd .. && ./venv/bin/python metrics_sync.py";
+    // Use relative path from dashboard/ to repo root, then run from scripts/
+    const cmd = "cd .. && ./venv/bin/python scripts/metrics_sync.py";
     exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (err, _stdout, stderr) => {
       if (err) console.error("metrics_sync failed:", err.message, stderr);
       else console.log("metrics_sync completed");

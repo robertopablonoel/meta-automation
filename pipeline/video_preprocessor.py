@@ -43,7 +43,7 @@ def extract_audio(video_path: Path, output_wav: Path) -> Path:
     return output_wav
 
 
-def transcribe_audio(wav_path: Path, model) -> str:
+def transcribe_audio(wav_path: Path, model) -> tuple[str, str, float]:
     """Transcribe a WAV file using a pre-loaded faster-whisper model.
 
     Args:
@@ -51,13 +51,16 @@ def transcribe_audio(wav_path: Path, model) -> str:
         model: A faster_whisper.WhisperModel instance (loaded once, reused).
 
     Returns:
-        Full transcript as a single string.
+        Tuple of (transcript, detected_language, language_probability).
     """
-    segments, _info = model.transcribe(str(wav_path), beam_size=5)
+    segments, info = model.transcribe(str(wav_path), beam_size=5)
     texts = [segment.text.strip() for segment in segments]
     transcript = " ".join(texts)
-    logger.info(f"  Transcribed {wav_path.name} ({len(transcript)} chars)")
-    return transcript
+    logger.info(
+        f"  Transcribed {wav_path.name} ({len(transcript)} chars, "
+        f"lang={info.language} p={info.language_probability:.2f})"
+    )
+    return transcript, info.language, info.language_probability
 
 
 def extract_frames(video_path: Path, output_dir: Path, duration: float, n_frames: int = 3) -> list[Path]:
@@ -116,7 +119,7 @@ def preprocess_video(video_path: Path, output_base: Path, model) -> dict:
     # Audio + transcription
     wav_path = vid_dir / "audio.wav"
     extract_audio(video_path, wav_path)
-    transcript = transcribe_audio(wav_path, model)
+    transcript, detected_language, language_probability = transcribe_audio(wav_path, model)
 
     return {
         "video_filename": video_path.name,
@@ -124,6 +127,8 @@ def preprocess_video(video_path: Path, output_base: Path, model) -> dict:
         "media_type": "video",
         "duration_seconds": round(duration, 1),
         "transcript": transcript,
+        "detected_language": detected_language,
+        "language_probability": language_probability,
         "frame_paths": [str(p) for p in frame_paths],
     }
 

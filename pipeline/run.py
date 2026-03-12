@@ -54,10 +54,12 @@ from .config import (
     VIDEO_CLASSIFICATIONS_JSON,
     GLOBAL_SUBGROUPS_JSON,
     SUBGROUP_LABELS_JSON,
+    CONSOLIDATED_JSON,
     USE_CLIP_SUBGROUPING,
     CLIP_DISTANCE_THRESHOLD,
     CLIP_MODEL_NAME,
     CLIP_EMBEDDINGS_CACHE_DIR,
+    PIPELINE_LANGUAGE,
 )
 from .brand_context import (
     load_brand_context,
@@ -337,6 +339,24 @@ def _build_media_items_for_classify(
     return items
 
 
+# ── Language Detection ────────────────────────────────────────────────────
+
+def detect_language(video_infos: list[dict], image_paths: list[Path]) -> str:
+    """Auto-detect pipeline language from video transcripts.
+
+    Uses majority vote from Whisper's detected_language field.
+    Falls back to "en" for image-only batches.
+    """
+    if not video_infos:
+        return "en"  # image-only → default English
+
+    from collections import Counter
+    langs = [vi.get("detected_language", "en") for vi in video_infos]
+    detected = Counter(langs).most_common(1)[0][0]
+    logger.info(f"Language auto-detected from {len(video_infos)} video(s): {detected} (distribution: {dict(Counter(langs))})")
+    return detected
+
+
 # ── Pass 0: Video Preprocessing ─────────────────────────────────────────
 
 def run_preprocess_videos(video_paths: list[Path], force: bool = False) -> list[dict]:
@@ -366,6 +386,7 @@ async def run_describe(
     image_paths: list[Path],
     video_infos: list[dict],
     force: bool = False,
+    language: str = "en",
 ) -> list[dict]:
     """Pass 1: Describe all images and videos (concurrent). Skips if descriptions.json exists."""
     if not force and DESCRIPTIONS_JSON.exists():
@@ -373,14 +394,14 @@ async def run_describe(
         logger.info(f"Pass 1: Loaded {len(descriptions)} cached descriptions from {DESCRIPTIONS_JSON}")
         return descriptions
 
-    logger.info("Loading brand context from PDFs...")
-    brand_context = load_brand_context()
-    system_messages = build_describe_system(brand_context)
+    logger.info("Loading brand context...")
+    brand_context = load_brand_context(language)
+    system_messages = build_describe_system(brand_context, language)
     logger.info(f"Brand context loaded ({len(brand_context):,} chars)")
 
     total = len(image_paths) + len(video_infos)
     logger.info(f"Pass 1: Describing {total} media items ({len(image_paths)} images, {len(video_infos)} videos)...")
-    descriptions = await describe_all_media(client, system_messages, image_paths, video_infos)
+    descriptions = await describe_all_media(client, system_messages, image_paths, video_infos, language=language)
 
     save_json(descriptions, DESCRIPTIONS_JSON)
     return descriptions
@@ -553,6 +574,7 @@ async def run_discover_video(
     descriptions: list[dict],
     video_infos: list[dict],
     force: bool = False,
+    language: str = "en",
 ) -> dict:
     """Pass 2b: Discover video hook categories from VIDEO descriptions only."""
     if not force and VIDEO_CATEGORIES_JSON.exists():
@@ -566,12 +588,12 @@ async def run_discover_video(
 
     video_descriptions = [d for d in descriptions if d.get("media_type") == "video"]
 
-    logger.info("Loading brand context from PDFs...")
-    brand_context = load_brand_context()
-    system_messages = build_discover_video_system(brand_context)
+    logger.info("Loading brand context...")
+    brand_context = load_brand_context(language)
+    system_messages = build_discover_video_system(brand_context, language)
 
     logger.info(f"Pass 2b: Discovering video hook categories from {len(video_descriptions)} videos (streaming)...")
-    result = await discover_video_categories(client, system_messages, video_descriptions, video_infos)
+    result = await discover_video_categories(client, system_messages, video_descriptions, video_infos, language=language)
 
     categories_output = {
         "reasoning": result.reasoning,
@@ -589,7 +611,7 @@ async def run_discover_video(
 
 # ── Pass 3: Discover Image Categories ────────────────────────────────────
 
-async def run_discover(client: anthropic.AsyncAnthropic, descriptions: list[dict], force: bool = False) -> dict:
+async def run_discover(client: anthropic.AsyncAnthropic, descriptions: list[dict], force: bool = False, language: str = "en") -> dict:
     """Pass 3: Discover categories from IMAGE descriptions only. Skips if categories.json exists."""
     if not force and CATEGORIES_JSON.exists():
         categories_output = load_json(CATEGORIES_JSON)
@@ -598,9 +620,9 @@ async def run_discover(client: anthropic.AsyncAnthropic, descriptions: list[dict
 
     image_descriptions = [d for d in descriptions if d.get("media_type") != "video"]
 
-    logger.info("Loading brand context from PDFs...")
-    brand_context = load_brand_context()
-    system_messages = build_discover_system(brand_context)
+    logger.info("Loading brand context...")
+    brand_context = load_brand_context(language)
+    system_messages = build_discover_system(brand_context, language)
 
     logger.info(f"Pass 3: Discovering image concept categories from {len(image_descriptions)} images (streaming)...")
     result = await discover_categories(client, system_messages, image_descriptions)
@@ -626,6 +648,7 @@ async def run_label_subgroups(
     global_subgroups: list[dict],
     categories_output: dict,
     force: bool = False,
+    language: str = "en",
 ) -> list[dict]:
     """Pass 3b: Label each visual sub-group with a strategic concept category.
 
@@ -636,8 +659,8 @@ async def run_label_subgroups(
         logger.info(f"Pass 3b: Loaded {len(labels)} cached sub-group labels")
         return labels
 
-    brand_context = load_brand_context()
-    system_messages = build_label_subgroup_system(brand_context, categories_output["categories"])
+    brand_context = load_brand_context(language)
+    system_messages = build_label_subgroup_system(brand_context, categories_output["categories"], language)
     category_names = [cat["name"] for cat in categories_output["categories"]]
 
     logger.info(f"Pass 3b: Labeling {len(global_subgroups)} sub-groups into {len(category_names)} concepts...")
@@ -659,6 +682,7 @@ async def run_classify_videos(
     descriptions: list[dict],
     video_infos: list[dict],
     force: bool = False,
+    language: str = "en",
 ) -> list[dict]:
     """Pass 3c: Classify videos individually into video hook categories."""
     if not force and VIDEO_CLASSIFICATIONS_JSON.exists():
@@ -675,13 +699,13 @@ async def run_classify_videos(
         logger.warning("Pass 3c: No video categories discovered, skipping")
         return []
 
-    brand_context = load_brand_context()
-    video_system = build_classify_system(brand_context, video_cats)
+    brand_context = load_brand_context(language)
+    video_system = build_classify_system(brand_context, video_cats, language)
     video_category_names = [cat["name"] for cat in video_cats]
 
     video_items = _build_media_items_for_classify([], descriptions, video_infos)
     logger.info(f"Pass 3c: Classifying {len(video_items)} videos into video hook categories...")
-    video_cls = await classify_all_media(client, video_system, video_items, video_category_names)
+    video_cls = await classify_all_media(client, video_system, video_items, video_category_names, language=language)
 
     save_json(video_cls, VIDEO_CLASSIFICATIONS_JSON)
     return video_cls
@@ -731,28 +755,30 @@ async def run_generation(
     categories_output: dict,
     video_categories_output: dict | None = None,
     per_subgroup: bool = False,
+    language: str = "en",
 ) -> dict:
     """Pass 4: Generate copy (concurrent).
 
     Args:
         per_subgroup: If True, generate unique copy per sub-group.
                       If False (default), generate copy per concept and share across sub-groups.
+        language: Pipeline language code.
     """
     # Merge image + video categories for copy gen context
     all_categories = list(categories_output["categories"])
     if video_categories_output and video_categories_output.get("categories"):
         all_categories.extend(video_categories_output["categories"])
 
-    logger.info("Loading brand context from PDFs...")
-    brand_context = load_brand_context()
-    system_messages = build_copygen_system(brand_context, all_categories)
+    logger.info("Loading brand context...")
+    brand_context = load_brand_context(language)
+    system_messages = build_copygen_system(brand_context, all_categories, language)
 
     cat_lookup = {cat["name"]: cat for cat in all_categories}
 
     if per_subgroup:
         total_sg = sum(len(sgs) for sgs in subgroups_data.values())
         logger.info(f"Pass 4: Generating copy for {total_sg} sub-groups across {len(subgroups_data)} concepts...")
-        concept_results = await generate_all_subgroup_copy(client, system_messages, subgroups_data, cat_lookup)
+        concept_results = await generate_all_subgroup_copy(client, system_messages, subgroups_data, cat_lookup, language=language)
     else:
         # Generate copy at concept level, then distribute to sub-groups
         # Build concept-level groups (flatten sub-group images into one list per concept)
@@ -764,7 +790,7 @@ async def run_generation(
             groups[concept] = items
 
         logger.info(f"Pass 4: Generating copy for {len(groups)} concepts (shared across sub-groups)...")
-        raw_results = await generate_all_concept_copy(client, system_messages, groups, cat_lookup)
+        raw_results = await generate_all_concept_copy(client, system_messages, groups, cat_lookup, language=language)
 
         # Reshape: attach concept-level variations to each sub-group
         concept_variations = {r["creative_concept"]: r["variations"] for r in raw_results}
@@ -801,23 +827,24 @@ async def run_full_pipeline(
     client: anthropic.AsyncAnthropic,
     force: bool = False,
     per_subgroup: bool = False,
+    language: str = "en",
 ) -> dict:
     """Run all passes end-to-end, resuming from last checkpoint."""
     image_paths, video_paths = _load_media()
     video_infos = run_preprocess_videos(video_paths, force=force)
-    descriptions = await run_describe(client, image_paths, video_infos, force=force)
+    descriptions = await run_describe(client, image_paths, video_infos, force=force, language=language)
 
     # Pass 2: Global visual sub-grouping (images only)
     global_subgroups = await run_global_subgroup(client, image_paths, descriptions, force=force)
 
     # Pass 2b + 3: Discover categories
-    video_categories_output = await run_discover_video(client, descriptions, video_infos, force=force)
-    categories_output = await run_discover(client, descriptions, force=force)
+    video_categories_output = await run_discover_video(client, descriptions, video_infos, force=force, language=language)
+    categories_output = await run_discover(client, descriptions, force=force, language=language)
 
     # Pass 3b + 3c: Label sub-groups + classify videos
-    labels = await run_label_subgroups(client, global_subgroups, categories_output, force=force)
+    labels = await run_label_subgroups(client, global_subgroups, categories_output, force=force, language=language)
     video_cls = await run_classify_videos(
-        client, video_categories_output, descriptions, video_infos, force=force,
+        client, video_categories_output, descriptions, video_infos, force=force, language=language,
     )
 
     # Assemble final structure
@@ -834,9 +861,70 @@ async def run_full_pipeline(
 
     # Pass 4: Copy generation
     output = await run_generation(
-        client, subgroups_data, categories_output, video_categories_output, per_subgroup=per_subgroup,
+        client, subgroups_data, categories_output, video_categories_output,
+        per_subgroup=per_subgroup, language=language,
     )
     return output
+
+
+# ── Consolidation ─────────────────────────────────────────────────────────
+
+def run_consolidate():
+    """Merge all pipeline output JSONs into a single consolidated file."""
+    video_preprocessed = load_json(VIDEO_PREPROCESSED_JSON) if VIDEO_PREPROCESSED_JSON.exists() else []
+    descriptions = load_json(DESCRIPTIONS_JSON) if DESCRIPTIONS_JSON.exists() else []
+    video_classifications = load_json(VIDEO_CLASSIFICATIONS_JSON) if VIDEO_CLASSIFICATIONS_JSON.exists() else []
+    ad_copy_output = load_json(OUTPUT_JSON) if OUTPUT_JSON.exists() else {}
+
+    transcript_by_file = {v["video_filename"]: v for v in video_preprocessed}
+    desc_by_file = {d["image_filename"]: d for d in descriptions}
+    classification_by_file = {c["image_filename"]: c for c in video_classifications}
+
+    copy_by_file: dict[str, dict] = {}
+    for concept in ad_copy_output.get("concepts", []):
+        concept_name = concept["creative_concept"]
+        for sg in concept["sub_groups"]:
+            sg_name = sg["sub_group_name"]
+            for filename in sg["images"]:
+                copy_by_file[filename] = {
+                    "creative_concept": concept_name,
+                    "sub_group": sg_name,
+                    "ad_copy_variations": sg["variations"],
+                }
+
+    all_filenames = set()
+    all_filenames.update(transcript_by_file.keys())
+    all_filenames.update(desc_by_file.keys())
+    all_filenames.update(classification_by_file.keys())
+    all_filenames.update(copy_by_file.keys())
+
+    result = []
+    for filename in sorted(all_filenames):
+        vp = transcript_by_file.get(filename, {})
+        desc = desc_by_file.get(filename, {})
+        cls = classification_by_file.get(filename, {})
+        copy = copy_by_file.get(filename, {})
+
+        result.append({
+            "filename": filename,
+            "media_type": vp.get("media_type") or desc.get("media_type", "image"),
+            "duration_seconds": vp.get("duration_seconds"),
+            "detected_language": vp.get("detected_language"),
+            "transcript": vp.get("transcript", ""),
+            "transcript_summary": desc.get("transcript_summary", ""),
+            "visual_elements": desc.get("visual_elements", ""),
+            "emotional_tone": desc.get("emotional_tone", ""),
+            "implied_message": desc.get("implied_message", ""),
+            "target_awareness_level": desc.get("target_awareness_level", ""),
+            "creative_concept": cls.get("creative_concept") or copy.get("creative_concept", ""),
+            "concept_reasoning": cls.get("concept_reasoning", ""),
+            "sub_group": copy.get("sub_group", ""),
+            "ad_copy_variations": copy.get("ad_copy_variations", []),
+        })
+
+    save_json(result, CONSOLIDATED_JSON)
+    logger.info(f"Consolidated {len(result)} creatives -> {CONSOLIDATED_JSON}")
+    return result
 
 
 # ── Meta Upload ───────────────────────────────────────────────────────────
@@ -927,10 +1015,24 @@ async def async_main(args):
     meta_summary = None
 
     try:
+        # ── Resolve language ──────────────────────────────────────────
+        # For modes that preprocess videos, detect language after Pass 0.
+        # For checkpoint-only modes (generate_copy, upload_only), use CLI arg or default.
+        language = args.language
+        if language == "auto" and not args.generate_copy and not args.upload_only:
+            _image_paths, video_paths = _load_media()
+            video_infos = run_preprocess_videos(video_paths, force=force)
+            language = detect_language(video_infos, _image_paths)
+        elif language == "auto":
+            # Checkpoint modes: try to detect from cached video_preprocessed.json
+            video_infos = _load_video_infos()
+            language = detect_language(video_infos, [])
+        logger.info(f"Pipeline language: {language}")
+
         if args.describe_only:
             image_paths, video_paths = _load_media()
             video_infos = run_preprocess_videos(video_paths, force=force)
-            descriptions = await run_describe(client, image_paths, video_infos, force=force)
+            descriptions = await run_describe(client, image_paths, video_infos, force=force, language=language)
             print(f"\nDescribed {len(descriptions)} media items. Saved to {DESCRIPTIONS_JSON}")
             print("Next step: python -m pipeline.run --subgroup-only")
             return
@@ -938,7 +1040,7 @@ async def async_main(args):
         elif args.subgroup_only:
             image_paths, video_paths = _load_media()
             video_infos = run_preprocess_videos(video_paths, force=force)
-            descriptions = await run_describe(client, image_paths, video_infos, force=force)
+            descriptions = await run_describe(client, image_paths, video_infos, force=force, language=language)
             global_subgroups = await run_global_subgroup(client, image_paths, descriptions, force=force)
             total_items = sum(len(sg["images"]) for sg in global_subgroups)
             print(f"\nCreated {len(global_subgroups)} global visual sub-groups covering {total_items} images")
@@ -948,10 +1050,10 @@ async def async_main(args):
         elif args.discover_only:
             image_paths, video_paths = _load_media()
             video_infos = run_preprocess_videos(video_paths, force=force)
-            descriptions = await run_describe(client, image_paths, video_infos, force=force)
+            descriptions = await run_describe(client, image_paths, video_infos, force=force, language=language)
             global_subgroups = await run_global_subgroup(client, image_paths, descriptions, force=force)
-            categories_output = await run_discover(client, descriptions, force=force)
-            video_categories_output = await run_discover_video(client, descriptions, video_infos, force=force)
+            categories_output = await run_discover(client, descriptions, force=force, language=language)
+            video_categories_output = await run_discover_video(client, descriptions, video_infos, force=force, language=language)
             all_cats = list(categories_output["categories"]) + video_categories_output.get("categories", [])
             output = {"categories": all_cats, "concepts": []}
             print(f"\nDiscovered {len(categories_output['categories'])} image + {len(video_categories_output.get('categories', []))} video categories")
@@ -962,13 +1064,13 @@ async def async_main(args):
         elif args.classify_only:
             image_paths, video_paths = _load_media()
             video_infos = run_preprocess_videos(video_paths, force=force)
-            descriptions = await run_describe(client, image_paths, video_infos, force=force)
+            descriptions = await run_describe(client, image_paths, video_infos, force=force, language=language)
             global_subgroups = await run_global_subgroup(client, image_paths, descriptions, force=force)
-            categories_output = await run_discover(client, descriptions, force=force)
-            video_categories_output = await run_discover_video(client, descriptions, video_infos, force=force)
-            labels = await run_label_subgroups(client, global_subgroups, categories_output, force=force)
+            categories_output = await run_discover(client, descriptions, force=force, language=language)
+            video_categories_output = await run_discover_video(client, descriptions, video_infos, force=force, language=language)
+            labels = await run_label_subgroups(client, global_subgroups, categories_output, force=force, language=language)
             video_cls = await run_classify_videos(
-                client, video_categories_output, descriptions, video_infos, force=force,
+                client, video_categories_output, descriptions, video_infos, force=force, language=language,
             )
 
             subgroups_data = _assemble_subgroups_data(global_subgroups, labels, video_cls)
@@ -1013,7 +1115,7 @@ async def async_main(args):
             video_categories_output = load_json(VIDEO_CATEGORIES_JSON) if VIDEO_CATEGORIES_JSON.exists() else {"categories": []}
             output = await run_generation(
                 client, subgroups_data, categories_output, video_categories_output,
-                per_subgroup=args.subgroup_copy,
+                per_subgroup=args.subgroup_copy, language=language,
             )
             if args.upload:
                 meta_summary = run_upload(output)
@@ -1028,11 +1130,14 @@ async def async_main(args):
 
         else:
             # Default: full pipeline (all passes, resumes from checkpoints)
-            output = await run_full_pipeline(client, force=force, per_subgroup=args.subgroup_copy)
+            output = await run_full_pipeline(client, force=force, per_subgroup=args.subgroup_copy, language=language)
             if args.upload:
                 meta_summary = run_upload(output)
 
         print_summary(output, meta_summary)
+
+        # Consolidate all outputs into a single JSON
+        run_consolidate()
 
         # Publish to Supabase if requested
         if args.publish:
@@ -1108,6 +1213,12 @@ def main():
         "--publish",
         action="store_true",
         help="Publish pipeline output to Supabase for dashboard (runs after all passes)",
+    )
+    parser.add_argument(
+        "--language",
+        choices=["auto", "en", "es"],
+        default=PIPELINE_LANGUAGE,
+        help="Pipeline language: auto-detect from video audio (default), or force en/es",
     )
     args = parser.parse_args()
 

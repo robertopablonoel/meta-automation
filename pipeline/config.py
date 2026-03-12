@@ -10,11 +10,21 @@ INPUT_DIR = BASE_DIR / "input_images"
 OUTPUT_DIR = BASE_DIR / "output"
 OUTPUT_JSON = OUTPUT_DIR / "ad_copy_output.json"
 OUTPUT_CSV = OUTPUT_DIR / "ad_copy_output.csv"
+CONSOLIDATED_JSON = OUTPUT_DIR / "consolidated.json"
 
-# Brand doc PDFs
+# Brand doc PDFs (English)
 AVATAR_SHEET_PDF = BASE_DIR / "brand" / "03-avatar-sheet.pdf"
 OFFER_BRIEF_PDF = BASE_DIR / "brand" / "04-offer-brief.pdf"
 NECESSARY_BELIEFS_PDF = BASE_DIR / "brand" / "05-necessary-beliefs.pdf"
+
+# Brand docs (Spanish)
+BRAND_DIR_ES = BASE_DIR / "brand" / "es"
+AVATAR_SHEET_ES = BRAND_DIR_ES / "03-avatar-sheet.txt"
+OFFER_BRIEF_ES = BRAND_DIR_ES / "04-offer-brief.txt"
+NECESSARY_BELIEFS_ES = BRAND_DIR_ES / "05-necessary-beliefs.txt"
+
+# ── Language ──────────────────────────────────────────────────────────────
+PIPELINE_LANGUAGE = os.getenv("PIPELINE_LANGUAGE", "auto")
 
 # ── Anthropic ──────────────────────────────────────────────────────────────
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")

@@ -201,6 +201,7 @@ async def describe_video(
     semaphore: asyncio.Semaphore,
     index: int,
     total: int,
+    language: str = "en",
 ) -> dict:
     """Describe a video using its extracted frames + audio transcript."""
     async with semaphore:
@@ -225,6 +226,7 @@ async def describe_video(
         if len(transcript) > 3000:
             transcript = transcript[:3000] + "..."
 
+        lang_suffix = "\n\nWrite all output in Spanish (Latin American)." if language == "es" else ""
         content_blocks.append({
             "type": "text",
             "text": (
@@ -234,7 +236,7 @@ async def describe_video(
                 f"## AUDIO TRANSCRIPT\n{transcript}\n\n"
                 f"Analyze the visual elements across frames, emotional tone, "
                 f"implied message, target awareness level, and provide a transcript_summary "
-                f"(1-2 sentence summary of what the speaker says and the key selling points)."
+                f"(1-2 sentence summary of what the speaker says and the key selling points).{lang_suffix}"
             ),
         })
 
@@ -273,6 +275,7 @@ async def describe_all_media(
     system_messages: list[dict],
     image_paths: list[Path],
     video_infos: list[dict],
+    language: str = "en",
 ) -> list[dict]:
     """Pass 1: Describe all images and videos concurrently."""
     semaphore = asyncio.Semaphore(MAX_CONCURRENT)
@@ -286,7 +289,7 @@ async def describe_all_media(
     # Video tasks
     offset = len(image_paths)
     for i, vinfo in enumerate(video_infos, 1):
-        tasks.append(describe_video(client, system_messages, vinfo, semaphore, offset + i, total))
+        tasks.append(describe_video(client, system_messages, vinfo, semaphore, offset + i, total, language=language))
 
     results = await asyncio.gather(*tasks)
     return list(results)
@@ -375,6 +378,7 @@ async def discover_video_categories(
     system_messages: list[dict],
     video_descriptions: list[dict],
     video_infos: list[dict],
+    language: str = "en",
 ) -> CategoryDiscoveryResult:
     """Pass 2b: Discover hook-based categories from video descriptions.
 
@@ -399,6 +403,7 @@ async def discover_video_categories(
         if d.get("transcript_summary"):
             desc_text += f"- **Full Transcript Summary**: {d['transcript_summary']}\n"
 
+    lang_suffix = "\n\nWrite all output in Spanish (Latin American)." if language == "es" else ""
     user_message = {
         "role": "user",
         "content": (
@@ -410,7 +415,7 @@ async def discover_video_categories(
             f"- Categories should be MECE for THIS batch of videos\n"
             f"- Each category needs a clear hook pattern\n"
             f"- Assign each video to its best-fit category in `example_images`\n"
-            f"- Aim for 2-5 categories"
+            f"- Aim for 2-5 categories{lang_suffix}"
         ),
     }
 
@@ -457,6 +462,7 @@ async def classify_media_item(
     original_filename: str = "",
     media_type_label: str = "image",
     transcript: str = "",
+    language: str = "en",
 ) -> dict:
     """Classify a single media item (image or video thumbnail) into one of the discovered categories."""
     async with semaphore:
@@ -477,6 +483,7 @@ async def classify_media_item(
             },
         ]
 
+        lang_suffix = "\n\nWrite all output in Spanish (Latin American)." if language == "es" else ""
         if transcript:
             # Only use the opening hook (~200 chars) for video classification
             hook_excerpt = transcript[:200] + ("..." if len(transcript) > 200 else "")
@@ -489,13 +496,13 @@ async def classify_media_item(
                 f"(most videos eventually mention enzymes vs probiotics — that's not what "
                 f"makes them strategically distinct).\n\n"
                 f"Opening hook transcript:\n{hook_excerpt}\n\n"
-                f"Return the category name and your reasoning."
+                f"Return the category name and your reasoning.{lang_suffix}"
             )
         else:
             text = (
                 f"Classify this ad creative ({display_name}) "
                 f"into exactly ONE of these categories: {categories_str}\n\n"
-                f"Return the category name and your reasoning."
+                f"Return the category name and your reasoning.{lang_suffix}"
             )
 
         content_blocks.append({"type": "text", "text": text})
@@ -538,6 +545,7 @@ async def classify_all_media(
     system_messages: list[dict],
     media_items: list[dict],
     category_names: list[str],
+    language: str = "en",
 ) -> list[dict]:
     """Pass 3: Classify all media items concurrently into discovered categories.
 
@@ -558,6 +566,7 @@ async def classify_all_media(
             original_filename=item["original_filename"],
             media_type_label=item.get("media_type", "image"),
             transcript=item.get("transcript", ""),
+            language=language,
         )
         for i, item in enumerate(media_items, 1)
     ]
@@ -896,6 +905,7 @@ async def generate_concept_copy(
     image_paths: list[Path],
     semaphore: asyncio.Semaphore,
     filename_map: dict[str, str] | None = None,
+    language: str = "en",
 ) -> ConceptCopyResult:
     """Generate copy for a concept group.
 
@@ -924,6 +934,7 @@ async def generate_concept_copy(
         has_videos = any(n.endswith(".mp4") or n.endswith(".mov") for n in display_names)
         video_note = " Some are video thumbnails — copy should work for both image and video ads." if has_videos else ""
 
+        lang_suffix = "\n\nWrite all copy in Spanish (Latin American)." if language == "es" else ""
         content_blocks.append({
             "type": "text",
             "text": (
@@ -937,7 +948,7 @@ async def generate_concept_copy(
                 f"- headline: under 40 characters\n"
                 f"- description: under 30 characters\n\n"
                 f"Vary the emotional angle across variations — mix hooks, tones, and "
-                f"belief angles within the '{concept}' concept."
+                f"belief angles within the '{concept}' concept.{lang_suffix}"
             ),
         })
 
@@ -966,6 +977,7 @@ async def generate_all_concept_copy(
     groups: dict[str, list[dict]],
     cat_lookup: dict[str, dict],
     filename_map: dict[str, str] | None = None,
+    language: str = "en",
 ) -> list[dict]:
     """Pass 4: Generate copy for all concept groups concurrently."""
     semaphore = asyncio.Semaphore(MAX_CONCURRENT)
@@ -975,6 +987,7 @@ async def generate_all_concept_copy(
         concept_desc = cat_lookup.get(concept, {}).get("description", concept)
         copy_result = await generate_concept_copy(
             client, system_messages, concept, concept_desc, img_paths, semaphore, filename_map,
+            language=language,
         )
         return {
             "creative_concept": concept,
@@ -991,6 +1004,7 @@ async def generate_all_subgroup_copy(
     system_messages: list[dict],
     subgroups_data: dict,
     cat_lookup: dict[str, dict],
+    language: str = "en",
 ) -> list[dict]:
     """Pass 4 (sub-group aware): Generate copy per sub-group within each concept.
 
@@ -998,6 +1012,7 @@ async def generate_all_subgroup_copy(
         subgroups_data: Dict with concept names as keys, each containing a list of sub-groups
                         with 'sub_group_name' and 'images' (list of dicts with image_path/image_filename).
         cat_lookup: Category metadata lookup.
+        language: Pipeline language code.
 
     Returns a list of concept dicts, each with sub_groups containing variations.
     """
@@ -1022,6 +1037,7 @@ async def generate_all_subgroup_copy(
         copy_result = await generate_concept_copy(
             client, system_messages, f"{concept}/{sub_group_name}",
             concept_desc, img_paths, semaphore, fmap or None,
+            language=language,
         )
         return {
             "sub_group_name": sub_group_name,

@@ -22,7 +22,8 @@ from datetime import datetime, timezone
 import requests
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", "dashboard", ".env.local"))
+load_dotenv()  # fallback to .env in cwd
 
 logging.basicConfig(
     level=logging.INFO,

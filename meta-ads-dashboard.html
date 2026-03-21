@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spicy Cubes — Meta Ads Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background-color: #faf1e0;
+    font-family: 'Georgia', serif;
+    color: #000;
+    min-height: 100vh;
+  }
+
+  header {
+    background-color: #7b1c14;
+    padding: 32px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 4px solid #ff473b;
+  }
+
+  header h1 {
+    color: #fdfaf1;
+    font-size: 28px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  header .subtitle {
+    color: #FCA5A5;
+    font-size: 13px;
+    letter-spacing: 1px;
+    margin-top: 4px;
+    font-style: italic;
+  }
+
+  .badge {
+    background: #ff473b;
+    color: #fdfaf1;
+    font-size: 11px;
+    font-family: monospace;
+    padding: 6px 14px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 48px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 48px;
+  }
+
+  .category-block {
+    background: #fdfaf1;
+    border-radius: 12px;
+    border: 1px solid #e8d9bc;
+    box-shadow: 0 4px 20px rgba(123,28,20,0.08);
+    overflow: hidden;
+  }
+
+  .category-header {
+    background: #7b1c14;
+    padding: 20px 28px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+  }
+
+  .category-title {
+    color: #fdfaf1;
+    font-size: 20px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .category-label {
+    color: #FCA5A5;
+    font-size: 11px;
+    font-family: monospace;
+    margin-top: 4px;
+    letter-spacing: 1px;
+  }
+
+  .video-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+    flex-shrink: 0;
+  }
+
+  .pill {
+    background: rgba(253,250,241,0.15);
+    color: #fdfaf1;
+    border: 1px solid rgba(253,250,241,0.3);
+    font-size: 11px;
+    font-family: monospace;
+    padding: 4px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+
+  .variations-container {
+    padding: 24px 28px;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .tab-btn {
+    background: none;
+    border: 1px solid #d4b896;
+    color: #444545;
+    font-size: 12px;
+    font-family: 'Georgia', serif;
+    padding: 8px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+
+  .tab-btn:hover {
+    border-color: #7b1c14;
+    color: #7b1c14;
+  }
+
+  .tab-btn.active {
+    background: #7b1c14;
+    border-color: #7b1c14;
+    color: #fdfaf1;
+  }
+
+  .variation-panel {
+    display: none;
+  }
+
+  .variation-panel.active {
+    display: block;
+  }
+
+  .field {
+    margin-bottom: 16px;
+  }
+
+  .field-label {
+    font-size: 10px;
+    font-family: monospace;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #7b1c14;
+    margin-bottom: 6px;
+    font-weight: bold;
+  }
+
+  .field-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .field-text {
+    flex: 1;
+    background: #faf1e0;
+    border: 1px solid #e8d9bc;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #000;
+    font-family: 'Georgia', serif;
+  }
+
+  .field-text.headline {
+    font-size: 16px;
+    font-weight: bold;
+    color: #7b1c14;
+  }
+
+  .field-text.description {
+    font-size: 13px;
+    color: #444545;
+  }
+
+  .copy-btn {
+    background: #fdfaf1;
+    border: 1px solid #d4b896;
+    color: #7b1c14;
+    font-size: 11px;
+    font-family: monospace;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .copy-btn:hover {
+    background: #7b1c14;
+    color: #fdfaf1;
+    border-color: #7b1c14;
+  }
+
+  .copy-btn.copied {
+    background: #ff473b;
+    color: #fdfaf1;
+    border-color: #ff473b;
+  }
+
+  .copy-all-btn {
+    background: #ff473b;
+    color: #fdfaf1;
+    border: none;
+    font-size: 12px;
+    font-family: monospace;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-top: 8px;
+  }
+
+  .copy-all-btn:hover {
+    background: #7b1c14;
+  }
+
+  .copy-all-btn.copied {
+    background: #444545;
+  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid #e8d9bc;
+    margin: 20px 0;
+  }
+
+  footer {
+    text-align: center;
+    padding: 32px;
+    color: #444545;
+    font-size: 12px;
+    font-family: monospace;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Spicy Cubes</h1>
+    <div class="subtitle">Meta Ads Copy Dashboard</div>
+  </div>
+  <div class="badge">4 Categorías · 10 Videos · 20 Variaciones</div>
+</header>
+
+<main id="main"></main>
+
+<footer>spicycubes.com — meta ads pipeline output</footer>
+
+<script>
+const data = [
+  {
+    concept: "comparacion_producto_superior",
+    label: "Comparación: Producto Superior",
+    videos: ["Kamila1.mov", "Kamila3.mov", "Kamila8.mov", "Kamila11.mov"],
+    variations: [
+      {
+        primary_text: "Pensé que era otra gomita más HASTA QUE vi el tamaño. 6 gramos vs. las gomitas bonitas de 2g que no hacen nada. La diferencia no es estética — es que las otras no pueden contener dosis clínicas. 600mg de fenogreco, 500mg de tribulus. Las cantidades que funcionaron en los estudios.",
+        headline: "Dosis Clínicas, No Gomitas Bonitas",
+        description: "600mg fenogreco. 500mg tribulus."
+      },
+      {
+        primary_text: "Si estas 2 marcas tuvieran un bebé, sería esto. Todo el mundo habla de los honey packs pero nadie te dice que existe la versión para mujeres — con dosis que realmente funcionan. Me quedé en shock de lo que ya hay en el mercado comparado con esto.",
+        headline: "La Versión Para Mujeres",
+        description: "Enzimas, no probióticos."
+      },
+      {
+        primary_text: "Te han estado estafando con gomitas lindas que no funcionan. La mayoría tienen 50-100mg de ingredientes activos. Esta tiene 600mg de fenogreco solo. ¿Sabes cuál funciona de verdad? A lo mejor sí te da energía — porque contiene lo que tu cuerpo necesita.",
+        headline: "600mg vs. Cantidades Insuficientes",
+        description: "Dosis que funcionan de verdad."
+      },
+      {
+        primary_text: "La diferencia entre esto y lo que probaste antes: ellas eligieron empaque bonito, nosotras elegimos eficacia. Por eso la gomita es 3 veces más grande. Por eso no te hincha como los probióticos. Por eso sientes la diferencia en semanas, no meses.",
+        headline: "Eficacia Sobre Estética",
+        description: "3x más grande. Funciona mejor."
+      },
+      {
+        primary_text: "Todas las gomitas de wellness prometen lo mismo. Pero cuando comparas las etiquetas, la mayoría no lista cantidades en mg — solo 'mezcla patentada'. Esta te dice exactamente qué contiene: 600mg fenogreco, 500mg tribulus, 30mg azafrán. Sin secretos. Sin estafas.",
+        headline: "Sin Mezclas Patentadas. Sin Estafas.",
+        description: "Cantidades exactas listadas."
+      }
+    ]
+  },
+  {
+    concept: "testimonio_resultados_confrontacional",
+    label: "Testimonio: Resultados Confrontacional",
+    videos: ["Kamila4.mov", "Kamila7.mov", "Kamila9.mov", "Kamila10.mov"],
+    variations: [
+      {
+        primary_text: "Después de 90 días tomándolas consistentemente — estos son MIS resultados. No te voy a mentir, la primera semana pensé que era placebo. Pero semana 3 algo cambió. Y ahora entiendo por qué todas guardaban el secreto.",
+        headline: "Balance Real, Resultados Reales",
+        description: "90 días. Garantía total."
+      },
+      {
+        primary_text: "Spicy Cubes vengan y explíquense porque literal no me dejaron dormir anoche 👀 Nunca pensé que diría esto después de años sintiéndome apagada, pero aquí estamos. Esto no es lo que esperaba — es MEJOR.",
+        headline: "Enzimas Que Funcionan",
+        description: "600mg fenogreco clínico."
+      },
+      {
+        primary_text: "Siempre están criticando a las mujeres que 'no quieren' — pero nadie analiza POR QUÉ. Después de probar estas gomitas entendí: no estaba rota, estaba bioquímicamente agotada. La diferencia es real y la voy a gritar.",
+        headline: "No Estás Rota",
+        description: "4.8⭐ de compradoras reales."
+      },
+      {
+        primary_text: "Les voy a contar qué hay dentro de estas gomitas que tanto critican sin probar: dosis clínicas REALES. 600mg de fenogreco, 500mg tribulus, 30mg azafrán. Las mismas cantidades que usaron los estudios. Por eso funcionan cuando otras no.",
+        headline: "Dosis Clínicas, No Promesas",
+        description: "Sin probióticos. Sin hinchazón."
+      },
+      {
+        primary_text: "Tomé estas gomitas por 90 días solo para demostrar que era otra estafa más. Spoiler: me equivoqué completamente. La consistencia importa, las dosis clínicas importan, y sentirte tú misma otra vez no tiene precio. Aquí está mi experiencia real.",
+        headline: "Mi Experiencia: 90 Días",
+        description: "Envío gratis. Garantía 90d."
+      }
+    ]
+  },
+  {
+    concept: "perdida_identidad_maternal",
+    label: "Pérdida de Identidad Maternal",
+    videos: ["Kamila6.mov", "Kamila12.mov"],
+    variations: [
+      {
+        primary_text: "Después de tener hijos ya no me reconocía. Cero energía, cero ganas, cero yo. Hasta que probé algo diseñado específicamente para madres agotadas — no más probióticos que me hinchaban. Enzimas en dosis clínicas que realmente funcionan.",
+        headline: "Vuelve a Sentirte Tú",
+        description: "Enzimas. Sin probióticos."
+      },
+      {
+        primary_text: "Nadie te dice que post-parto te sientes desconectada de ti misma. Los análisis salieron 'normales' pero yo sabía que algo andaba mal. Esto no es debilidad — es bioquímico. Y tiene solución.",
+        headline: "No Estás Rota, Estás Agotada",
+        description: "600mg fenogreco. Garantía."
+      },
+      {
+        primary_text: "Mi cuerpo lo reclaman los niños todo el día. Me quedé sin nada para mí. Spicy Cubes me devolvió la energía que creí perdida para siempre. Una gomita diaria con dosis que realmente funcionan.",
+        headline: "Para Mamás Que Se Perdieron",
+        description: "Dosis clínicas. Sin hinchazón."
+      },
+      {
+        primary_text: "Era una indeseable con mal humor constante. Probé probióticos, terapia, adaptógenos — nada funcionó. Hasta que encontré gomitas con enzimas (no bacterias) en cantidades que los estudios comprueban. Chica, igual yo.",
+        headline: "Mamá Agotada a Mamá Presente",
+        description: "4.8 estrellas. Envío gratis."
+      },
+      {
+        primary_text: "Solía ser espontánea, divertida, YO. Después de hijos solo quedó cansancio. Mereces intentar una vez más con algo diseñado para este problema exacto. Garantía 90 días — no tienes nada que perder excepto la versión de ti que extrañas.",
+        headline: "Recupera Tu Chispa Maternal",
+        description: "Prueba 90 días. Reembolso."
+      }
+    ]
+  },
+  {
+    concept: "secreto_insider_revelado",
+    label: "Secreto Insider Revelado",
+    videos: ["Kamila2.mov", "Kamila5.mov"],
+    variations: [
+      {
+        primary_text: "Todo el mundo está hablando de estos paquetitos pero nadie te dice que hay una versión para mujeres. No es magia — son 600mg de fenogreco, 500mg de tribulus, 30mg de azafrán. Las dosis que realmente funcionan, no las que caben en un frasco bonito. Link en bio.",
+        headline: "La Versión Que Nadie Cuenta",
+        description: "Dosis clínicas. Envío gratis."
+      },
+      {
+        primary_text: "Esto es lo que muchas mujeres estaban tomando y no querían compartir el secreto. Gomitas a base de enzimas, no probióticos que te hinchan. Una al día. Sin vergüenza. Solo resultados que no querías que nadie supiera que necesitabas.",
+        headline: "El Secreto Que Todas Guardan",
+        description: "Sin probióticos. Sin hinchazón."
+      },
+      {
+        primary_text: "Si viste los honey packs en todos lados, esto es lo mismo pero hecho BIEN para mujeres. Ingredientes clínicos que realmente funcionan para deseo, energía y ánimo. No polvos random — dosis estudiadas. Te cuento por qué todas lo están probando.",
+        headline: "Honey Packs Pero Para Nosotras",
+        description: "Garantía 90 días. Envío gratis."
+      },
+      {
+        primary_text: "Nadie quiere admitir que necesita ayuda con esto, pero chica, todas estamos en lo mismo. La diferencia es que algunas ya encontraron lo que funciona y lo están guardando para sí. Enzimas, no bacterias. Una gomita. Link abajo.",
+        headline: "Lo Que Nadie Te Está Diciendo",
+        description: "4.8 estrellas. 350+ reseñas."
+      },
+      {
+        primary_text: "Todo el mundo habla de estos suplementos pero te venden el empaque bonito con dosis que no sirven. Esta gomita es 3 veces más grande porque tiene las cantidades REALES que funcionaron en los estudios. Por eso todas la quieren y nadie la comparte.",
+        headline: "Por Qué Es 3 Veces Más Grande",
+        description: "Dosis reales. Resultados reales."
+      }
+    ]
+  }
+];
+
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '✓ Copiado';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copiar';
+      btn.classList.remove('copied');
+    }, 1500);
+  });
+}
+
+function copyAll(variation, btn) {
+  const full = `PRIMARY TEXT:\n${variation.primary_text}\n\nHEADLINE:\n${variation.headline}\n\nDESCRIPTION:\n${variation.description}`;
+  navigator.clipboard.writeText(full).then(() => {
+    btn.textContent = '✓ Todo Copiado';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copiar Todo';
+      btn.classList.remove('copied');
+    }, 1500);
+  });
+}
+
+function switchTab(categoryIndex, varIndex) {
+  const panels = document.querySelectorAll(`.variation-panel[data-cat="${categoryIndex}"]`);
+  const tabs = document.querySelectorAll(`.tab-btn[data-cat="${categoryIndex}"]`);
+  panels.forEach(p => p.classList.remove('active'));
+  tabs.forEach(t => t.classList.remove('active'));
+  document.querySelector(`.variation-panel[data-cat="${categoryIndex}"][data-var="${varIndex}"]`).classList.add('active');
+  document.querySelector(`.tab-btn[data-cat="${categoryIndex}"][data-var="${varIndex}"]`).classList.add('active');
+}
+
+const main = document.getElementById('main');
+
+data.forEach((cat, ci) => {
+  const block = document.createElement('div');
+  block.className = 'category-block';
+
+  const pills = cat.videos.map(v => `<span class="pill">${v}</span>`).join('');
+
+  const tabs = cat.variations.map((_, vi) =>
+    `<button class="tab-btn${vi === 0 ? ' active' : ''}" data-cat="${ci}" data-var="${vi}" onclick="switchTab(${ci},${vi})">Variación ${vi + 1}</button>`
+  ).join('');
+
+  const panels = cat.variations.map((v, vi) => `
+    <div class="variation-panel${vi === 0 ? ' active' : ''}" data-cat="${ci}" data-var="${vi}">
+      <div class="field">
+        <div class="field-label">Primary Text</div>
+        <div class="field-row">
+          <div class="field-text">${v.primary_text}</div>
+          <button class="copy-btn" onclick="copyText(${JSON.stringify(v.primary_text)}, this)">Copiar</button>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Headline</div>
+        <div class="field-row">
+          <div class="field-text headline">${v.headline}</div>
+          <button class="copy-btn" onclick="copyText(${JSON.stringify(v.headline)}, this)">Copiar</button>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label">Description</div>
+        <div class="field-row">
+          <div class="field-text description">${v.description}</div>
+          <button class="copy-btn" onclick="copyText(${JSON.stringify(v.description)}, this)">Copiar</button>
+        </div>
+      </div>
+      <button class="copy-all-btn" onclick="copyAll(${JSON.stringify(v)}, this)">Copiar Todo</button>
+    </div>
+  `).join('');
+
+  block.innerHTML = `
+    <div class="category-header">
+      <div>
+        <div class="category-title">${cat.label}</div>
+        <div class="category-label">${cat.concept}</div>
+      </div>
+      <div class="video-pills">${pills}</div>
+    </div>
+    <div class="variations-container">
+      <div class="tabs">${tabs}</div>
+      ${panels}
+    </div>
+  `;
+
+  main.appendChild(block);
+});
+</script>
+</body>
+</html>

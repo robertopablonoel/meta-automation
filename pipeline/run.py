@@ -357,6 +357,22 @@ def detect_language(video_infos: list[dict], image_paths: list[Path]) -> str:
     return detected
 
 
+def filter_videos_by_language(video_infos: list[dict], language: str) -> list[dict]:
+    """Drop videos whose detected language doesn't match the requested language.
+
+    Only filters when a specific language is requested (not 'auto').
+    """
+    if language == "auto":
+        return video_infos
+    filtered = [vi for vi in video_infos if vi.get("detected_language", language) == language]
+    skipped = len(video_infos) - len(filtered)
+    if skipped:
+        skipped_names = [vi["video_filename"] for vi in video_infos if vi.get("detected_language", language) != language]
+        logger.info(f"Skipping {skipped} video(s) with non-{language} audio: {skipped_names}")
+    logger.info(f"Processing {len(filtered)} {language} video(s)")
+    return filtered
+
+
 # ── Pass 0: Video Preprocessing ─────────────────────────────────────────
 
 def run_preprocess_videos(video_paths: list[Path], force: bool = False) -> list[dict]:
@@ -832,6 +848,7 @@ async def run_full_pipeline(
     """Run all passes end-to-end, resuming from last checkpoint."""
     image_paths, video_paths = _load_media()
     video_infos = run_preprocess_videos(video_paths, force=force)
+    video_infos = filter_videos_by_language(video_infos, language)
     descriptions = await run_describe(client, image_paths, video_infos, force=force, language=language)
 
     # Pass 2: Global visual sub-grouping (images only)
@@ -869,12 +886,20 @@ async def run_full_pipeline(
 
 # ── Consolidation ─────────────────────────────────────────────────────────
 
-def run_consolidate():
-    """Merge all pipeline output JSONs into a single consolidated file."""
+def run_consolidate(language: str = "auto"):
+    """Merge all pipeline output JSONs into a single consolidated file.
+
+    Filters to the specified language and saves as consolidated_{language}.json.
+    Falls back to consolidated.json when language is 'auto'.
+    """
     video_preprocessed = load_json(VIDEO_PREPROCESSED_JSON) if VIDEO_PREPROCESSED_JSON.exists() else []
     descriptions = load_json(DESCRIPTIONS_JSON) if DESCRIPTIONS_JSON.exists() else []
     video_classifications = load_json(VIDEO_CLASSIFICATIONS_JSON) if VIDEO_CLASSIFICATIONS_JSON.exists() else []
     ad_copy_output = load_json(OUTPUT_JSON) if OUTPUT_JSON.exists() else {}
+
+    # Only include videos matching the requested language
+    if language != "auto":
+        video_preprocessed = [v for v in video_preprocessed if v.get("detected_language") == language]
 
     transcript_by_file = {v["video_filename"]: v for v in video_preprocessed}
     desc_by_file = {d["image_filename"]: d for d in descriptions}
@@ -922,8 +947,9 @@ def run_consolidate():
             "ad_copy_variations": copy.get("ad_copy_variations", []),
         })
 
-    save_json(result, CONSOLIDATED_JSON)
-    logger.info(f"Consolidated {len(result)} creatives -> {CONSOLIDATED_JSON}")
+    output_path = OUTPUT_DIR / (f"consolidated_{language}.json" if language != "auto" else "consolidated.json")
+    save_json(result, output_path)
+    logger.info(f"Consolidated {len(result)} creatives -> {output_path}")
     return result
 
 
@@ -1031,7 +1057,7 @@ async def async_main(args):
 
         if args.describe_only:
             image_paths, video_paths = _load_media()
-            video_infos = run_preprocess_videos(video_paths, force=force)
+            video_infos = filter_videos_by_language(run_preprocess_videos(video_paths, force=force), language)
             descriptions = await run_describe(client, image_paths, video_infos, force=force, language=language)
             print(f"\nDescribed {len(descriptions)} media items. Saved to {DESCRIPTIONS_JSON}")
             print("Next step: python -m pipeline.run --subgroup-only")
@@ -1039,7 +1065,7 @@ async def async_main(args):
 
         elif args.subgroup_only:
             image_paths, video_paths = _load_media()
-            video_infos = run_preprocess_videos(video_paths, force=force)
+            video_infos = filter_videos_by_language(run_preprocess_videos(video_paths, force=force), language)
             descriptions = await run_describe(client, image_paths, video_infos, force=force, language=language)
             global_subgroups = await run_global_subgroup(client, image_paths, descriptions, force=force)
             total_items = sum(len(sg["images"]) for sg in global_subgroups)
@@ -1049,7 +1075,7 @@ async def async_main(args):
 
         elif args.discover_only:
             image_paths, video_paths = _load_media()
-            video_infos = run_preprocess_videos(video_paths, force=force)
+            video_infos = filter_videos_by_language(run_preprocess_videos(video_paths, force=force), language)
             descriptions = await run_describe(client, image_paths, video_infos, force=force, language=language)
             global_subgroups = await run_global_subgroup(client, image_paths, descriptions, force=force)
             categories_output = await run_discover(client, descriptions, force=force, language=language)
@@ -1063,7 +1089,7 @@ async def async_main(args):
 
         elif args.classify_only:
             image_paths, video_paths = _load_media()
-            video_infos = run_preprocess_videos(video_paths, force=force)
+            video_infos = filter_videos_by_language(run_preprocess_videos(video_paths, force=force), language)
             descriptions = await run_describe(client, image_paths, video_infos, force=force, language=language)
             global_subgroups = await run_global_subgroup(client, image_paths, descriptions, force=force)
             categories_output = await run_discover(client, descriptions, force=force, language=language)
@@ -1137,7 +1163,7 @@ async def async_main(args):
         print_summary(output, meta_summary)
 
         # Consolidate all outputs into a single JSON
-        run_consolidate()
+        run_consolidate(language=language)
 
         # Publish to Supabase if requested
         if args.publish:

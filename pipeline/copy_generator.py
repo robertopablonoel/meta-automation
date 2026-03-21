@@ -151,7 +151,7 @@ async def describe_image(
         async def call():
             return await client.messages.parse(
                 model=MODEL_NAME,
-                max_tokens=1024,
+                max_tokens=2048,
                 system=system_messages,
                 messages=[user_message],
                 output_format=ImageDescription,
@@ -245,7 +245,7 @@ async def describe_video(
         async def call():
             return await client.messages.parse(
                 model=MODEL_NAME,
-                max_tokens=1024,
+                max_tokens=2048,
                 system=system_messages,
                 messages=[user_message],
                 output_format=ImageDescription,

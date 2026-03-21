@@ -930,18 +930,26 @@ def run_consolidate(language: str = "auto"):
         cls = classification_by_file.get(filename, {})
         copy = copy_by_file.get(filename, {})
 
+        concept = cls.get("creative_concept") or copy.get("creative_concept", "")
+        transcript = vp.get("transcript", "")
+        suffix = Path(filename).suffix
+        category_label = concept.replace("_", " ").title().replace(" ", "_")
+        hook = _hook_from_transcript(transcript)
+        ad_filename = _safe_filename(f"{category_label}-{hook}") + suffix
+
         result.append({
             "filename": filename,
+            "ad_filename": ad_filename,
             "media_type": vp.get("media_type") or desc.get("media_type", "image"),
             "duration_seconds": vp.get("duration_seconds"),
             "detected_language": vp.get("detected_language"),
-            "transcript": vp.get("transcript", ""),
+            "transcript": transcript,
             "transcript_summary": desc.get("transcript_summary", ""),
             "visual_elements": desc.get("visual_elements", ""),
             "emotional_tone": desc.get("emotional_tone", ""),
             "implied_message": desc.get("implied_message", ""),
             "target_awareness_level": desc.get("target_awareness_level", ""),
-            "creative_concept": cls.get("creative_concept") or copy.get("creative_concept", ""),
+            "creative_concept": concept,
             "concept_reasoning": cls.get("concept_reasoning", ""),
             "sub_group": copy.get("sub_group", ""),
             "ad_copy_variations": copy.get("ad_copy_variations", []),
@@ -951,6 +959,53 @@ def run_consolidate(language: str = "auto"):
     save_json(result, output_path)
     logger.info(f"Consolidated {len(result)} creatives -> {output_path}")
     return result
+
+
+# ── Rename Videos for Meta Upload ─────────────────────────────────────────
+
+def _hook_from_transcript(transcript: str, words: int = 6) -> str:
+    """Extract the first N words of a transcript as a hook slug.
+
+    Strips punctuation from each word and joins with underscores.
+    """
+    import re
+    if not transcript:
+        return ""
+    tokens = transcript.strip().split()[:words]
+    cleaned = [re.sub(r"[^\w]", "", t) for t in tokens]
+    cleaned = [t for t in cleaned if t]
+    return "_".join(cleaned)
+
+
+def _safe_filename(name: str) -> str:
+    """Strip characters that are invalid in filenames."""
+    invalid = r'\/:*?"<>|'
+    for ch in invalid:
+        name = name.replace(ch, "")
+    return name.strip()
+
+
+def run_rename_videos(consolidated: list[dict]) -> Path:
+    """Copy pipeline videos into output/renamed_videos/ using the ad_filename from consolidated JSON."""
+    out_dir = OUTPUT_DIR / "renamed_videos"
+    out_dir.mkdir(exist_ok=True)
+
+    count = 0
+    for item in consolidated:
+        src_name = item.get("filename", "")
+        ad_filename = item.get("ad_filename", "")
+        if not src_name or not ad_filename:
+            continue
+        src = INPUT_DIR / src_name
+        if not src.exists():
+            logger.warning(f"Source video not found, skipping rename: {src_name}")
+            continue
+        shutil.copy2(src, out_dir / ad_filename)
+        logger.info(f"Renamed: {src_name} -> {ad_filename}")
+        count += 1
+
+    logger.info(f"Renamed {count} video(s) -> {out_dir}")
+    return out_dir
 
 
 # ── Meta Upload ───────────────────────────────────────────────────────────
@@ -1163,7 +1218,10 @@ async def async_main(args):
         print_summary(output, meta_summary)
 
         # Consolidate all outputs into a single JSON
-        run_consolidate(language=language)
+        consolidated = run_consolidate(language=language)
+
+        # Rename videos to match Meta ad name format for bulk upload
+        run_rename_videos(consolidated)
 
         # Publish to Supabase if requested
         if args.publish:

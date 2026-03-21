@@ -356,12 +356,6 @@ function toLabel(concept) {
   return concept.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-function hookFromTranscript(transcript) {
-  if (!transcript) return '';
-  const words = transcript.trim().split(/\s+/).slice(0, 6).join(' ');
-  return words.length < transcript.trim().length ? words + '...' : words;
-}
-
 function buildData(raw) {
   const map = new Map();
   for (const item of raw) {
@@ -372,11 +366,12 @@ function buildData(raw) {
         concept: key,
         label: toLabel(key),
         videos: [],
+        ad_filenames: [],
         variations: item.ad_copy_variations || [],
-        hook: hookFromTranscript(item.transcript),
       });
     }
     map.get(key).videos.push(item.filename);
+    if (item.ad_filename) map.get(key).ad_filenames.push(item.ad_filename);
   }
   return Array.from(map.values()).filter(c => c.variations.length > 0);
 }
@@ -388,7 +383,6 @@ const activeVar = {};
 // Video filename → Meta Video ID mapping
 let videoIds = {};
 // Hook text (first ~6 words of transcript) per category index
-const hookStore = {};
 // Category metadata per index
 const catStore = {};
 
@@ -400,7 +394,7 @@ async function loadData() {
 
   for (const url of candidates) {
     try {
-      const res = await fetch(url);
+      const res = await fetch(`${url}?t=${Date.now()}`);
       if (!res.ok) continue;
       const raw = await res.json();
       const fileLang = url.match(/consolidated_(\w+)\.json/)?.[1];
@@ -473,12 +467,13 @@ async function exportToMeta() {
     'Ad Set Name':       ()        => AD_SET,
     'Ad Set Run Status': ()       => 'PAUSED',
     'Ad Status':         ()       => 'PAUSED',
-    'Ad Name':           (cat)    => `${cat.label} - ${hookStore[cat._ci] || ''}`,
+    'Ad Name':           (cat)    => (cat.ad_filenames[0] || '').replace(/\.[^.]+$/, ''),
     'Body':              (cat, v) => v.primary_text || '',
     'Title':             (cat, v) => v.headline || '',
     'Link Description':  (cat, v) => v.description || '',
     'Video ID':          (cat)    => cat.videos.map(f => videoIds[f] || '').filter(Boolean).join(', '),
-    'Video File Name':   (cat)    => cat.videos.join(', '),
+    'Video File Name':   (cat)    => cat.ad_filenames.join(', '),
+    'Link':              ()       => 'https://www.spicycubes.com/products/spicy-cubes-pineapple-dailies-for-her-2',
   };
 
   // Load the real exported file as the base
@@ -516,7 +511,7 @@ async function exportToMeta() {
     }
   }
 
-  // Write one row per category
+  // Write one row per video (each video in a category gets its own ad row)
   let rowIdx = 1;
   Object.keys(catStore).forEach(ci => {
     const cat = { ...catStore[ci], _ci: ci };
@@ -524,25 +519,30 @@ async function exportToMeta() {
     const v = varStore[`${ci}-${vi}`];
     if (!v) return;
 
-    // Clone template row
-    for (let c = range.s.c; c <= range.e.c; c++) {
-      if (templateRow[c]) ws[XLSX.utils.encode_cell({ r: rowIdx, c })] = { ...templateRow[c] };
-    }
+    cat.ad_filenames.forEach((adFilename, vidIdx) => {
+      // Single-video cat proxy for OVERWRITE functions
+      const singleCat = { ...cat, ad_filenames: [adFilename], videos: [cat.videos[vidIdx] || ''] };
 
-    // Clear ID fields
-    CLEAR_FIELDS.forEach(header => {
-      const c = colMap[header];
-      if (c !== undefined) delete ws[XLSX.utils.encode_cell({ r: rowIdx, c })];
+      // Clone template row
+      for (let c = range.s.c; c <= range.e.c; c++) {
+        if (templateRow[c]) ws[XLSX.utils.encode_cell({ r: rowIdx, c })] = { ...templateRow[c] };
+      }
+
+      // Clear ID fields
+      CLEAR_FIELDS.forEach(header => {
+        const c = colMap[header];
+        if (c !== undefined) delete ws[XLSX.utils.encode_cell({ r: rowIdx, c })];
+      });
+
+      // Overwrite with our data
+      Object.entries(OVERWRITE).forEach(([header, fn]) => {
+        const c = colMap[header];
+        if (c === undefined) return;
+        ws[XLSX.utils.encode_cell({ r: rowIdx, c })] = { t: 's', v: fn(singleCat, v) };
+      });
+
+      rowIdx++;
     });
-
-    // Overwrite with our data
-    Object.entries(OVERWRITE).forEach(([header, fn]) => {
-      const c = colMap[header];
-      if (c === undefined) return;
-      ws[XLSX.utils.encode_cell({ r: rowIdx, c })] = { t: 's', v: fn(cat, v) };
-    });
-
-    rowIdx++;
   });
 
   range.e.r = rowIdx - 1;
@@ -586,13 +586,15 @@ async function init() {
     // Store variations for safe retrieval by copy buttons
     cat.variations.forEach((v, vi) => { varStore[`${ci}-${vi}`] = v; });
     activeVar[ci] = 0;
-    hookStore[ci] = cat.hook;
     catStore[ci] = cat;
 
     const block = document.createElement('div');
     block.className = 'category-block';
 
-    const pills = cat.videos.map(v => `<span class="pill">${escapeHtml(v)}</span>`).join('');
+    const pills = cat.ad_filenames.map(f => {
+      const hook = f.replace(/^[^-]+-/, '').replace(/\.[^.]+$/, '');
+      return `<span class="pill">${escapeHtml(hook)}</span>`;
+    }).join('');
 
     const tabs = cat.variations.map((_, vi) =>
       `<button class="tab-btn${vi === 0 ? ' active' : ''}" data-cat="${ci}" data-var="${vi}" onclick="switchTab(${ci},${vi})">${t().variation(vi + 1)}</button>`

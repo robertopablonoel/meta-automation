@@ -10,6 +10,7 @@ class ImageDescription(BaseModel):
     implied_message: str       # What the image is trying to communicate to the viewer
     target_awareness_level: str  # Schwartz awareness level: unaware / problem-aware / solution-aware / product-aware / most-aware
     transcript_summary: str = ""  # Empty for images; populated for videos with audio transcript summary
+    overlay_copy: str = ""     # Verbatim text visible on the image (headlines, body copy, CTAs, captions); empty for video/UGC
 
 
 # ── Pass 2: Category Discovery ─────────────────────────────────────────────

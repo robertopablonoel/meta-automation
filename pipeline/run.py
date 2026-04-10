@@ -64,12 +64,14 @@ from .config import (
 from .brand_context import (
     load_brand_context,
     build_describe_system,
+    build_describe_static_system,
     build_discover_system,
     build_discover_video_system,
     build_classify_system,
     build_subgroup_system,
     build_label_subgroup_system,
     build_copygen_system,
+    build_copygen_static_system,
 )
 from .copy_generator import (
     describe_all_media,
@@ -172,7 +174,7 @@ def save_csv(output: dict, output_path: Path):
                     "description": var["description"],
                 })
 
-    with open(output_path, "w", newline="") as f:
+    with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=[
             "creative_concept",
             "sub_group_name",
@@ -403,6 +405,7 @@ async def run_describe(
     video_infos: list[dict],
     force: bool = False,
     language: str = "en",
+    static_mode: bool = False,
 ) -> list[dict]:
     """Pass 1: Describe all images and videos (concurrent). Skips if descriptions.json exists."""
     if not force and DESCRIPTIONS_JSON.exists():
@@ -412,7 +415,11 @@ async def run_describe(
 
     logger.info("Loading brand context...")
     brand_context = load_brand_context(language)
-    system_messages = build_describe_system(brand_context, language)
+    if static_mode:
+        system_messages = build_describe_static_system(brand_context, language)
+        logger.info("Pass 1: Using static ad description prompt (OCR + overlay copy extraction)")
+    else:
+        system_messages = build_describe_system(brand_context, language)
     logger.info(f"Brand context loaded ({len(brand_context):,} chars)")
 
     total = len(image_paths) + len(video_infos)
@@ -772,6 +779,8 @@ async def run_generation(
     video_categories_output: dict | None = None,
     per_subgroup: bool = False,
     language: str = "en",
+    static_mode: bool = False,
+    descriptions: list[dict] | None = None,
 ) -> dict:
     """Pass 4: Generate copy (concurrent).
 
@@ -779,6 +788,8 @@ async def run_generation(
         per_subgroup: If True, generate unique copy per sub-group.
                       If False (default), generate copy per concept and share across sub-groups.
         language: Pipeline language code.
+        static_mode: When True, uses static-aware copy gen prompt and passes overlay copy context.
+        descriptions: Full Pass 1 descriptions (used in static_mode to supply overlay_copy per image).
     """
     # Merge image + video categories for copy gen context
     all_categories = list(categories_output["categories"])
@@ -787,26 +798,46 @@ async def run_generation(
 
     logger.info("Loading brand context...")
     brand_context = load_brand_context(language)
-    system_messages = build_copygen_system(brand_context, all_categories, language)
+    if static_mode:
+        system_messages = build_copygen_static_system(brand_context, all_categories, language)
+        logger.info("Pass 4: Using static ad copy-gen prompt (overlay-aware)")
+    else:
+        system_messages = build_copygen_system(brand_context, all_categories, language)
 
     cat_lookup = {cat["name"]: cat for cat in all_categories}
+
+    # Build description lookup for static mode overlay copy context
+    desc_lookup: dict[str, dict] = {}
+    if static_mode and descriptions:
+        desc_lookup = {d["image_filename"]: d for d in descriptions}
 
     if per_subgroup:
         total_sg = sum(len(sgs) for sgs in subgroups_data.values())
         logger.info(f"Pass 4: Generating copy for {total_sg} sub-groups across {len(subgroups_data)} concepts...")
-        concept_results = await generate_all_subgroup_copy(client, system_messages, subgroups_data, cat_lookup, language=language)
+        concept_results = await generate_all_subgroup_copy(
+            client, system_messages, subgroups_data, cat_lookup,
+            language=language, static_mode=static_mode,
+        )
     else:
         # Generate copy at concept level, then distribute to sub-groups
         # Build concept-level groups (flatten sub-group images into one list per concept)
+        # Enrich each item with its description (for overlay_copy in static mode)
         groups: dict[str, list[dict]] = {}
         for concept, sgs in subgroups_data.items():
             items = []
             for sg in sgs:
-                items.extend(sg["images"])
+                for img in sg["images"]:
+                    enriched = dict(img)
+                    if static_mode and img["image_filename"] in desc_lookup:
+                        enriched["overlay_copy"] = desc_lookup[img["image_filename"]].get("overlay_copy", "")
+                    items.append(enriched)
             groups[concept] = items
 
         logger.info(f"Pass 4: Generating copy for {len(groups)} concepts (shared across sub-groups)...")
-        raw_results = await generate_all_concept_copy(client, system_messages, groups, cat_lookup, language=language)
+        raw_results = await generate_all_concept_copy(
+            client, system_messages, groups, cat_lookup,
+            language=language, static_mode=static_mode,
+        )
 
         # Reshape: attach concept-level variations to each sub-group
         concept_variations = {r["creative_concept"]: r["variations"] for r in raw_results}
@@ -844,25 +875,60 @@ async def run_full_pipeline(
     force: bool = False,
     per_subgroup: bool = False,
     language: str = "en",
+    static_mode: bool = False,
 ) -> dict:
-    """Run all passes end-to-end, resuming from last checkpoint."""
+    """Run all passes end-to-end, resuming from last checkpoint.
+
+    When static_mode=True:
+    - Skips Pass 0 (video preprocessing — no videos expected)
+    - Skips Pass 2b (video hook category discovery)
+    - Skips Pass 3c (video classification)
+    - Uses static-aware prompts for Pass 1 (OCR/overlay copy extraction) and Pass 4 (overlay-aware copy gen)
+    """
     image_paths, video_paths = _load_media()
-    video_infos = run_preprocess_videos(video_paths, force=force)
-    video_infos = filter_videos_by_language(video_infos, language)
-    descriptions = await run_describe(client, image_paths, video_infos, force=force, language=language)
+
+    if static_mode:
+        if video_paths:
+            logger.warning(
+                f"--static mode: ignoring {len(video_paths)} video file(s) found in input_images/. "
+                "Only image files (.jpg, .png, .webp) are processed in static mode."
+            )
+        video_infos: list[dict] = []
+        logger.info(f"--static mode: processing {len(image_paths)} static image(s), skipping all video passes")
+    else:
+        video_infos = run_preprocess_videos(video_paths, force=force)
+        video_infos = filter_videos_by_language(video_infos, language)
+
+    descriptions = await run_describe(
+        client, image_paths, video_infos, force=force, language=language, static_mode=static_mode,
+    )
 
     # Pass 2: Global visual sub-grouping (images only)
     global_subgroups = await run_global_subgroup(client, image_paths, descriptions, force=force)
 
-    # Pass 2b + 3: Discover categories
-    video_categories_output = await run_discover_video(client, descriptions, video_infos, force=force, language=language)
+    # Pass 2b: Discover video hook categories (skipped in static mode)
+    if static_mode:
+        video_categories_output: dict = {"reasoning": "", "categories": []}
+        logger.info("Pass 2b: Skipped (--static mode)")
+    else:
+        video_categories_output = await run_discover_video(
+            client, descriptions, video_infos, force=force, language=language,
+        )
+
+    # Pass 3: Discover image concept categories
     categories_output = await run_discover(client, descriptions, force=force, language=language)
 
-    # Pass 3b + 3c: Label sub-groups + classify videos
+    # Pass 3b: Label sub-groups
     labels = await run_label_subgroups(client, global_subgroups, categories_output, force=force, language=language)
-    video_cls = await run_classify_videos(
-        client, video_categories_output, descriptions, video_infos, force=force, language=language,
-    )
+
+    # Pass 3c: Classify videos (skipped in static mode)
+    if static_mode:
+        video_cls: list[dict] = []
+        logger.info("Pass 3c: Skipped (--static mode)")
+    else:
+        video_cls = await run_classify_videos(
+            client, video_categories_output, descriptions, video_infos, force=force, language=language,
+        )
 
     # Assemble final structure
     subgroups_data = _assemble_subgroups_data(global_subgroups, labels, video_cls)
@@ -880,6 +946,7 @@ async def run_full_pipeline(
     output = await run_generation(
         client, subgroups_data, categories_output, video_categories_output,
         per_subgroup=per_subgroup, language=language,
+        static_mode=static_mode, descriptions=descriptions,
     )
     return output
 
@@ -1002,14 +1069,15 @@ def run_rename_videos(consolidated: list[dict]) -> Path:
             logger.warning(f"Source video not found, skipping rename: {src_name}")
             continue
 
-        # Resolve collisions by appending _2, _3, etc.
+        # Resolve collisions by stem (without extension) so .jpg and .png files
+        # sharing the same concept name get one unified sequential counter.
         stem = Path(ad_filename).stem
         suffix = Path(ad_filename).suffix
-        if ad_filename in seen:
-            seen[ad_filename] += 1
-            dest_name = f"{stem}_{seen[ad_filename]}{suffix}"
+        if stem in seen:
+            seen[stem] += 1
+            dest_name = f"{stem}_{seen[stem]}{suffix}"
         else:
-            seen[ad_filename] = 1
+            seen[stem] = 1
             dest_name = ad_filename
 
         shutil.copy2(src, out_dir / dest_name)
@@ -1089,6 +1157,7 @@ def run_upload(output: dict) -> dict:
 async def async_main(args):
     """Single async entry point — one event loop, one client."""
     force = args.force
+    static_mode = getattr(args, "static", False)
 
     # Publish-only: just push existing data to Supabase
     if args.publish_only:
@@ -1112,8 +1181,12 @@ async def async_main(args):
         # ── Resolve language ──────────────────────────────────────────
         # For modes that preprocess videos, detect language after Pass 0.
         # For checkpoint-only modes (generate_copy, upload_only), use CLI arg or default.
+        # In static mode there are no videos, so skip detection and default to "en".
         language = args.language
-        if language == "auto" and not args.generate_copy and not args.upload_only:
+        if static_mode and language == "auto":
+            language = "en"
+            logger.info("--static mode: language defaulting to 'en' (no video audio to detect from)")
+        elif language == "auto" and not args.generate_copy and not args.upload_only:
             _image_paths, video_paths = _load_media()
             video_infos = run_preprocess_videos(video_paths, force=force)
             language = detect_language(video_infos, _image_paths)
@@ -1125,8 +1198,13 @@ async def async_main(args):
 
         if args.describe_only:
             image_paths, video_paths = _load_media()
-            video_infos = filter_videos_by_language(run_preprocess_videos(video_paths, force=force), language)
-            descriptions = await run_describe(client, image_paths, video_infos, force=force, language=language)
+            if static_mode:
+                video_infos = []
+            else:
+                video_infos = filter_videos_by_language(run_preprocess_videos(video_paths, force=force), language)
+            descriptions = await run_describe(
+                client, image_paths, video_infos, force=force, language=language, static_mode=static_mode,
+            )
             print(f"\nDescribed {len(descriptions)} media items. Saved to {DESCRIPTIONS_JSON}")
             print("Next step: python -m pipeline.run --subgroup-only")
             return
@@ -1207,9 +1285,11 @@ async def async_main(args):
             subgroups_data = load_json(SUBGROUPS_JSON)
             categories_output = load_json(CATEGORIES_JSON)
             video_categories_output = load_json(VIDEO_CATEGORIES_JSON) if VIDEO_CATEGORIES_JSON.exists() else {"categories": []}
+            descriptions = load_json(DESCRIPTIONS_JSON) if DESCRIPTIONS_JSON.exists() else []
             output = await run_generation(
                 client, subgroups_data, categories_output, video_categories_output,
                 per_subgroup=args.subgroup_copy, language=language,
+                static_mode=static_mode, descriptions=descriptions,
             )
             if args.upload:
                 meta_summary = run_upload(output)
@@ -1224,7 +1304,10 @@ async def async_main(args):
 
         else:
             # Default: full pipeline (all passes, resumes from checkpoints)
-            output = await run_full_pipeline(client, force=force, per_subgroup=args.subgroup_copy, language=language)
+            output = await run_full_pipeline(
+                client, force=force, per_subgroup=args.subgroup_copy, language=language,
+                static_mode=static_mode,
+            )
             if args.upload:
                 meta_summary = run_upload(output)
 
@@ -1319,6 +1402,15 @@ def main():
         choices=["auto", "en", "es"],
         default=PIPELINE_LANGUAGE,
         help="Pipeline language: auto-detect from video audio (default), or force en/es",
+    )
+    parser.add_argument(
+        "--static",
+        action="store_true",
+        help=(
+            "Static ad mode: skip all video passes (Pass 0, 2b, 3c), extract text overlays from "
+            "images in Pass 1, and generate overlay-aware copy in Pass 4. "
+            "Any video files in input_images/ are ignored."
+        ),
     )
     args = parser.parse_args()
 

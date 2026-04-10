@@ -172,6 +172,7 @@ async def describe_image(
             "implied_message": desc.implied_message,
             "target_awareness_level": desc.target_awareness_level,
             "transcript_summary": "",
+            "overlay_copy": desc.overlay_copy,
         }
 
 
@@ -906,11 +907,17 @@ async def generate_concept_copy(
     semaphore: asyncio.Semaphore,
     filename_map: dict[str, str] | None = None,
     language: str = "en",
+    static_mode: bool = False,
+    item_descriptions: list[dict] | None = None,
 ) -> ConceptCopyResult:
     """Generate copy for a concept group.
 
     Args:
         filename_map: Optional mapping from visual_path -> original_filename.
+        static_mode: When True, includes overlay copy context from item_descriptions
+                     so Claude knows what text is already on each static ad.
+        item_descriptions: Description dicts (with overlay_copy) for each image.
+                           Required when static_mode=True and useful overlay copy exists.
     """
     async with semaphore:
         logger.info(f"  Generating copy for '{concept}' ({len(image_paths)} creatives)...")
@@ -934,6 +941,30 @@ async def generate_concept_copy(
         has_videos = any(n.endswith(".mp4") or n.endswith(".mov") for n in display_names)
         video_note = " Some are video thumbnails — copy should work for both image and video ads." if has_videos else ""
 
+        # Build overlay copy context block for static ads
+        overlay_context = ""
+        if static_mode and item_descriptions:
+            desc_lookup = {d["image_filename"]: d for d in item_descriptions}
+            overlay_lines = []
+            for dname in display_names:
+                desc = desc_lookup.get(dname)
+                if desc and desc.get("overlay_copy"):
+                    overlay_lines.append(f"- **{dname}**: {desc['overlay_copy']}")
+            if overlay_lines:
+                overlay_context = (
+                    "\n\n**Text already on the images** (do NOT restate this in your copy — extend it instead):\n"
+                    + "\n".join(overlay_lines)
+                )
+
+        static_note = (
+            "\n\nIMPORTANT — STATIC ADS: These creatives already have copy printed on them "
+            "(headlines, body text, CTAs visible in the images above). "
+            "The copy you write goes in the Facebook/Instagram caption alongside the image. "
+            "Do NOT repeat what's already on the image. EXTEND the message with more story, "
+            "proof, or emotional depth. Generated headlines must differ from any headline on the image."
+            f"{overlay_context}"
+        ) if static_mode else video_note
+
         lang_suffix = "\n\nWrite all copy in Spanish (Latin American)." if language == "es" else ""
         content_blocks.append({
             "type": "text",
@@ -942,7 +973,7 @@ async def generate_concept_copy(
                 f"'{concept}' creative concept: {media_list}\n\n"
                 f"**Concept description**: {concept_description}\n\n"
                 f"Generate exactly {VARIATIONS_PER_CONCEPT} direct-response ad copy variations "
-                f"for this concept group. The copy should work well paired with ANY of these creatives.{video_note}\n\n"
+                f"for this concept group. The copy should work well paired with ANY of these creatives.{static_note}\n\n"
                 f"Each variation needs:\n"
                 f"- primary_text: 2-4 sentences, DR style\n"
                 f"- headline: under 40 characters\n"
@@ -978,6 +1009,7 @@ async def generate_all_concept_copy(
     cat_lookup: dict[str, dict],
     filename_map: dict[str, str] | None = None,
     language: str = "en",
+    static_mode: bool = False,
 ) -> list[dict]:
     """Pass 4: Generate copy for all concept groups concurrently."""
     semaphore = asyncio.Semaphore(MAX_CONCURRENT)
@@ -988,6 +1020,8 @@ async def generate_all_concept_copy(
         copy_result = await generate_concept_copy(
             client, system_messages, concept, concept_desc, img_paths, semaphore, filename_map,
             language=language,
+            static_mode=static_mode,
+            item_descriptions=items if static_mode else None,
         )
         return {
             "creative_concept": concept,
@@ -1005,6 +1039,7 @@ async def generate_all_subgroup_copy(
     subgroups_data: dict,
     cat_lookup: dict[str, dict],
     language: str = "en",
+    static_mode: bool = False,
 ) -> list[dict]:
     """Pass 4 (sub-group aware): Generate copy per sub-group within each concept.
 
@@ -1038,6 +1073,8 @@ async def generate_all_subgroup_copy(
             client, system_messages, f"{concept}/{sub_group_name}",
             concept_desc, img_paths, semaphore, fmap or None,
             language=language,
+            static_mode=static_mode,
+            item_descriptions=image_items if static_mode else None,
         )
         return {
             "sub_group_name": sub_group_name,

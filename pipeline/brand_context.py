@@ -95,6 +95,37 @@ Think like a media buyer analyzing creatives for pattern recognition.{lang_block
     ]
 
 
+# ── Pass 1 (Static): Describe Static Ad Creatives ────────────────────────
+
+def build_describe_static_system(brand_context: str, language: str = "en") -> list[dict]:
+    """System prompt for Pass 1 in --static mode: description with OCR of text overlays."""
+    lang_block = _language_directive(language)
+    return [
+        {
+            "type": "text",
+            "text": f"""\
+You are an expert direct-response advertising analyst working for Spicy Cubes Dailies, an enzyme-based gummy supplement for women's desire, energy, and mood.
+
+## YOUR TASK
+Describe what you see in each STATIC ad creative (jpg/png/webp). These are designed graphic ads — not UGC video frames. They typically contain text overlays such as headlines, body copy, calls-to-action, captions, or taglines baked directly into the image.
+
+Your description will be used by a strategist to discover natural concept groupings and to write complementary ad copy.
+
+Be precise and analytical:
+- **visual_elements**: Describe exactly what's shown — people, products, colors, layout, design style (text-heavy graphic, lifestyle photo with overlay, product hero, before/after, etc.). Note any design hierarchy (what the eye is drawn to first).
+- **emotional_tone**: What feeling does this creative evoke? (e.g., vulnerable, empowered, clinical, playful, aspirational, bold, intimate)
+- **implied_message**: What is this creative trying to communicate to the viewer? What belief is it building or what objection is it overcoming?
+- **target_awareness_level**: Using Eugene Schwartz's awareness spectrum, where does this creative meet the prospect? (unaware, problem-aware, solution-aware, product-aware, most-aware)
+- **overlay_copy**: READ ALL VISIBLE TEXT on the image verbatim — headlines, subheadlines, body copy, CTAs, captions, hashtags, ingredient callouts, guarantees, social proof snippets, anything printed on the creative. Quote it exactly as written. If there is no visible text, leave empty.
+- **transcript_summary**: Leave empty — this field is for video audio transcripts only.
+
+Think like a media buyer AND a copywriter analyzing creatives for pattern recognition and copy strategy.{lang_block}""",
+            "cache_control": {"type": "ephemeral"},
+        },
+        _brand_context_block(brand_context),
+    ]
+
+
 # ── Pass 2: Discover Categories ───────────────────────────────────────────
 
 def build_discover_system(brand_context: str, language: str = "en") -> list[dict]:
@@ -350,6 +381,85 @@ def build_copygen_system(brand_context: str, categories: list[dict], language: s
 - Reference specific pain points: probiotics that bloated her, doctors who dismissed her, the guilt of avoiding her partner's touch
 - Always differentiate: enzymes not probiotics, clinical doses not fairy dust, oversized gummy not cute packaging
 - Include specific details when relevant: 600mg fenugreek, 500mg tribulus, 30mg saffron, 120mg bromelain
+- Never be preachy or clinical. Be honest, raw, and permission-giving.
+- Vary the emotional angle across variations: mix hooks, tones, and belief angles within the assigned concept"""
+
+    return [
+        {
+            "type": "text",
+            "text": f"""\
+You are an expert direct-response copywriter for Spicy Cubes Dailies, an enzyme-based gummy supplement for women's desire, energy, and mood.
+
+## CREATIVE CONCEPT CATEGORIES (Discovered for This Batch)
+{category_context}
+
+{copy_rules}""",
+            "cache_control": {"type": "ephemeral"},
+        },
+        _brand_context_block(brand_context),
+    ]
+
+
+# ── Pass 4 (Static): Copy Generation for Static Ads ─────────────────────
+
+def build_copygen_static_system(brand_context: str, categories: list[dict], language: str = "en") -> list[dict]:
+    """System prompt for Pass 4 in --static mode: copy generation aware of existing overlay text.
+
+    Static ads already have copy baked into the image (headlines, body text, CTAs).
+    The generated copy (primary_text, headline, description) is the AD BODY — it lives in
+    the Facebook/Instagram post caption area alongside the image, not on the image itself.
+    It must complement and extend the visual's message, not restate it.
+    """
+    category_context = "\n\n".join(
+        f"### {cat['display_name']} (`{cat['name']}`)\n"
+        f"{cat['description']}\n"
+        f"Schwartz sophistication: {cat['schwartz_sophistication']}\n"
+        f"Builds belief: {cat['belief_mapping']}"
+        for cat in categories
+    )
+
+    if language == "es":
+        copy_rules = """\
+## COPY RULES FOR STATIC ADS
+Estas son creatividades estáticas — el texto ya está impreso en la imagen misma.
+El copy que vas a generar es el CUERPO DEL ANUNCIO: el texto del caption/post en Facebook/Instagram, NO el texto de la imagen.
+
+### Reglas clave:
+- **NO repitas** lo que ya dice la imagen — asume que el prospecto ya lo leyó
+- **EXTIENDE** el mensaje de la imagen: da más contexto, más prueba social, una historia más profunda, o un ángulo emocional complementario
+- Si la imagen tiene un headline fuerte, el `headline` generado debe ser DIFERENTE — un ángulo distinto del mismo concepto
+- Si la imagen tiene una CTA, el copy puede reforzarla o dar razones adicionales para hacer clic
+
+- **Primary Text**: 2-4 oraciones. Estilo DR. Gancho que para el scroll. Usa el lenguaje real del avatar — crudo, relatable, conversacional. Construye la creencia mapeada al concepto. El copy debe complementar VISUALMENTE la imagen, no contradecirla. Termina con CTA suave o curiosity gap.
+- **Headline**: Menos de 40 caracteres. Beneficio claro y directo. Diferente del headline impreso en la imagen si hay uno. Ejemplos: "Vuelve a Sentirte Tú", "Enzimas, No Probióticos", "Balance Diario Sin Hinchazón".
+- **Description**: 40-80 caracteres. Prueba social, detalles de oferta, o garantía. Combina 2-3 de: calificación de estrellas, conteo de reseñas, garantía de devolución, envío gratis, cancela cuando quieras, dosis clínicas, timeline de resultados.
+
+## ESTILO
+- Escribe como una mujer hablándole a su mejor amiga
+- Usa el lenguaje real del avatar: "Ya no me reconozco," "tal vez así soy ahora"
+- Diferencia siempre: enzimas no probióticos, dosis clínicas no polvos mágicos
+- Nunca seas moralista ni clínica. Sé honesta, cruda y da permiso.
+- Varía el ángulo emocional entre variaciones"""
+    else:
+        copy_rules = """\
+## COPY RULES FOR STATIC ADS
+These are static graphic ads — the copy is already printed on the image itself.
+The copy you're generating is the AD BODY: the Facebook/Instagram caption/post text that appears alongside the image, NOT text on the image.
+
+### Key rules:
+- **DO NOT restate** what the image already says — assume the prospect has already read it
+- **EXTEND** the image's message: add more context, more proof, a deeper story, or a complementary emotional angle
+- If the image has a strong headline, the generated `headline` must be DIFFERENT — a distinct angle on the same concept
+- If the image has a CTA, the copy can reinforce it or give additional reasons to click
+
+- **Primary Text**: 2-4 sentences. Direct response style. Hook that stops the scroll. Use the avatar's real language (raw, relatable). Must build the belief mapped to the concept. Copy should visually complement the image, not contradict it. End with a soft CTA or curiosity gap.
+- **Headline**: Under 40 characters. Clear benefit statement. Must be DIFFERENT from any headline already on the image. Examples: "Feel Like Yourself Again", "Enzymes, Not Probiotics", "Daily Balance Without the Bloat".
+- **Description**: 40-80 characters. Social proof, offer details, or guarantee. Combine 2-3 of: star rating, review count, money-back guarantee, free shipping, cancel anytime, clinical doses, timeline of results.
+
+## COPY STYLE
+- Write like a woman talking to her best friend, not a brand talking to a customer
+- Use the avatar's real language: "I don't recognize myself anymore," "maybe this is just who I am now"
+- Always differentiate: enzymes not probiotics, clinical doses not fairy dust
 - Never be preachy or clinical. Be honest, raw, and permission-giving.
 - Vary the emotional angle across variations: mix hooks, tones, and belief angles within the assigned concept"""
 

@@ -93,9 +93,14 @@
 
   .video-pills {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 6px;
-    justify-content: flex-end;
+    overflow-x: auto;
+    width: 100%;
+    padding-bottom: 4px;
+  }
+
+  .video-pills .pill {
     flex-shrink: 0;
   }
 
@@ -298,7 +303,112 @@
     font-size: 13px;
     color: #444545;
   }
+
+  .expand-btn {
+    background: rgba(253,250,241,0.15);
+    border: 1px solid rgba(253,250,241,0.3);
+    color: #fdfaf1;
+    font-size: 11px;
+    font-family: monospace;
+    padding: 4px 10px;
+    border-radius: 20px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+
+  .expand-btn:hover {
+    background: rgba(253,250,241,0.3);
+  }
+
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-overlay.open {
+    display: flex;
+  }
+
+  .modal {
+    background: #fdfaf1;
+    border-radius: 12px;
+    border: 1px solid #e8d9bc;
+    padding: 28px;
+    max-width: 640px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+  }
+
+  .modal-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #7b1c14;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+
+  .modal-subtitle {
+    font-size: 11px;
+    font-family: monospace;
+    color: #444545;
+    margin-bottom: 20px;
+  }
+
+  .modal-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .modal-pill {
+    background: #faf1e0;
+    border: 1px solid #e8d9bc;
+    color: #7b1c14;
+    font-size: 12px;
+    font-family: monospace;
+    padding: 6px 12px;
+    border-radius: 20px;
+  }
+
+  .modal-close {
+    display: block;
+    margin-top: 20px;
+    margin-left: auto;
+    background: #7b1c14;
+    color: #fdfaf1;
+    border: none;
+    font-size: 12px;
+    font-family: monospace;
+    padding: 8px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    letter-spacing: 1px;
+  }
+
+  .modal-close:hover {
+    background: #ff473b;
+  }
 </style>
+
+<!-- Modal -->
+<div class="modal-overlay" id="pillModal" onclick="if(event.target===this)closePillModal()">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle"></div>
+    <div class="modal-subtitle" id="modalSubtitle"></div>
+    <div class="modal-pills" id="modalPills"></div>
+    <button class="modal-close" onclick="closePillModal()">Close</button>
+  </div>
+</div>
 </head>
 <body>
 
@@ -411,6 +521,21 @@ async function loadData() {
     </div>`;
   document.getElementById('badge').textContent = t().noData;
   return null;
+}
+
+// ── Pill Modal ────────────────────────────────────────────────────────────
+function openPillModal(ci) {
+  const cat = catStore[ci];
+  document.getElementById('modalTitle').textContent = cat.label;
+  document.getElementById('modalSubtitle').textContent = `${cat.ad_filenames.length} videos`;
+  document.getElementById('modalPills').innerHTML = cat.ad_filenames.map(f =>
+    `<span class="modal-pill">${escapeHtml(f)}</span>`
+  ).join('');
+  document.getElementById('pillModal').classList.add('open');
+}
+
+function closePillModal() {
+  document.getElementById('pillModal').classList.remove('open');
 }
 
 // ── Copy helpers ──────────────────────────────────────────────────────────
@@ -629,11 +754,14 @@ async function init() {
 
     block.innerHTML = `
       <div class="category-header">
-        <div>
+        <div style="flex-shrink:0">
           <div class="category-title">${escapeHtml(cat.label)}</div>
           <div class="category-label">${escapeHtml(cat.concept)}</div>
         </div>
-        <div class="video-pills">${pills}</div>
+        <div style="display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden;flex:1 1 0">
+          <div class="video-pills">${pills}</div>
+        </div>
+        <button class="expand-btn" style="flex-shrink:0" onclick="openPillModal(${ci})">⊞ All</button>
       </div>
       <div class="variations-container">
         <div class="tabs">${tabs}</div>

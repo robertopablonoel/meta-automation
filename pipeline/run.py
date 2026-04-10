@@ -991,6 +991,7 @@ def run_rename_videos(consolidated: list[dict]) -> Path:
     out_dir.mkdir(exist_ok=True)
 
     count = 0
+    seen: dict[str, int] = {}
     for item in consolidated:
         src_name = item.get("filename", "")
         ad_filename = item.get("ad_filename", "")
@@ -1000,8 +1001,20 @@ def run_rename_videos(consolidated: list[dict]) -> Path:
         if not src.exists():
             logger.warning(f"Source video not found, skipping rename: {src_name}")
             continue
-        shutil.copy2(src, out_dir / ad_filename)
-        logger.info(f"Renamed: {src_name} -> {ad_filename}")
+
+        # Resolve collisions by appending _2, _3, etc.
+        stem = Path(ad_filename).stem
+        suffix = Path(ad_filename).suffix
+        if ad_filename in seen:
+            seen[ad_filename] += 1
+            dest_name = f"{stem}_{seen[ad_filename]}{suffix}"
+        else:
+            seen[ad_filename] = 1
+            dest_name = ad_filename
+
+        shutil.copy2(src, out_dir / dest_name)
+        item["ad_filename"] = dest_name  # update in-place so consolidated JSON stays in sync
+        logger.info(f"Renamed: {src_name} -> {dest_name}")
         count += 1
 
     logger.info(f"Renamed {count} video(s) -> {out_dir}")
@@ -1221,7 +1234,10 @@ async def async_main(args):
         consolidated = run_consolidate(language=language)
 
         # Rename videos to match Meta ad name format for bulk upload
+        # (may update ad_filename on collision — re-save consolidated JSON after)
         run_rename_videos(consolidated)
+        output_path = OUTPUT_DIR / (f"consolidated_{language}.json" if language != "auto" else "consolidated.json")
+        save_json(consolidated, output_path)
 
         # Publish to Supabase if requested
         if args.publish:

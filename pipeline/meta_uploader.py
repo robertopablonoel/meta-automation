@@ -25,6 +25,7 @@ from .config import (
     META_CUSTOM_CONVERSION_ID,
     LANDING_PAGE_URL,
     OUTPUT_DIR,
+    BRAND_DISPLAY_NAME,
 )
 
 logger = logging.getLogger(__name__)
@@ -491,7 +492,7 @@ def _log_campaign(base_name: str, campaign_name: str, campaign_id: str):
 
 def upload_to_meta(
     results: list[dict],
-    campaign_name: str = "Spicy Cubes Dailies - Auto Generated",
+    campaign_name: str = f"{BRAND_DISPLAY_NAME} - Auto Generated",
     daily_budget: int = 20000,
 ) -> dict:
     """Full upload flow: media -> campaign (CBO) -> ad sets -> ads with text variations.

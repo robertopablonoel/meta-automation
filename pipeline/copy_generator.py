@@ -7,7 +7,7 @@ from pathlib import Path
 
 import anthropic
 
-from .config import MODEL_NAME, VARIATIONS_PER_CONCEPT, MAX_CONCURRENT
+from .config import MODEL_NAME, VARIATIONS_PER_CONCEPT, MAX_CONCURRENT, BRAND_DISPLAY_NAME
 from .models import (
     ImageDescription,
     CategoryDiscoveryResult,
@@ -63,12 +63,25 @@ MIME_TYPES = {
 MAX_CONCEPT_IMAGES = 6
 
 
+def _detect_media_type(header: bytes) -> str:
+    """Detect image media type from magic bytes."""
+    if header[:8] == b'\x89PNG\r\n\x1a\n':
+        return "image/png"
+    if header[:2] == b'\xff\xd8':
+        return "image/jpeg"
+    if header[:4] == b'RIFF' and header[8:12] == b'WEBP':
+        return "image/webp"
+    if header[:6] in (b'GIF87a', b'GIF89a'):
+        return "image/gif"
+    return "image/jpeg"
+
+
 def _encode_image(image_path: Path) -> tuple[str, str]:
     """Read an image file and return (base64_data, media_type)."""
-    suffix = image_path.suffix.lower()
-    media_type = MIME_TYPES.get(suffix, "image/jpeg")
     with open(image_path, "rb") as f:
-        data = base64.standard_b64encode(f.read()).decode("utf-8")
+        raw = f.read()
+    media_type = _detect_media_type(raw[:12])
+    data = base64.standard_b64encode(raw).decode("utf-8")
     return data, media_type
 
 
@@ -324,7 +337,7 @@ async def discover_categories(
     user_message = {
         "role": "user",
         "content": (
-            f"Here are descriptions of {len(descriptions)} ad creative images for Spicy Cubes Dailies.\n\n"
+            f"Here are descriptions of {len(descriptions)} ad creative images for {BRAND_DISPLAY_NAME}.\n\n"
             f"## IMAGE DESCRIPTIONS\n{desc_text}\n\n"
             f"Analyze these creatives and discover the natural concept categories that emerge. "
             f"Apply Eugene Schwartz's market sophistication framework and map each category "
@@ -408,7 +421,7 @@ async def discover_video_categories(
     user_message = {
         "role": "user",
         "content": (
-            f"Here are descriptions of {len(video_descriptions)} UGC video ad creatives for Spicy Cubes Dailies.\n\n"
+            f"Here are descriptions of {len(video_descriptions)} UGC video ad creatives for {BRAND_DISPLAY_NAME}.\n\n"
             f"## VIDEO DESCRIPTIONS (with opening hooks)\n{desc_text}\n\n"
             f"Discover the natural VIDEO HOOK categories that emerge from these creatives. "
             f"Focus on the opening hook angle — what stops the scroll in the first 5-10 seconds.\n\n"

@@ -8,6 +8,12 @@ Usage:
     python -m scripts.meta_upload --limit 1
 
 Schema confirmed from live API testing 2026-05-05.
+
+Config may carry an optional "adset_id" (numeric string): ads are then created
+inside that EXISTING ad set (verified up front; create_ad_set is skipped, and
+no campaign is created either — the ad set's own campaign is adopted). Omitted
+→ the classic path: a NEW ad set named ad_set_name. Ads land PAUSED on both
+paths, unconditionally.
 """
 
 import argparse
@@ -124,6 +130,32 @@ def create_campaign(account, name: str, daily_budget: int, dry_run: bool) -> str
     return c["id"]
 
 
+def resolve_existing_ad_set(adset_id: str, campaign_id_override) -> dict:
+    """Read the target ad set (SDK read only — safe in dry-run) and hard-fail
+    BEFORE any media upload if it doesn't exist or, when the config also pins a
+    campaign_id, if it belongs to a different campaign."""
+    from facebook_business.adobjects.adset import AdSet
+    try:
+        data = AdSet(adset_id).api_get(
+            fields=["id", "name", "status", "effective_status", "campaign_id"]
+        ).export_all_data()
+    except Exception as e:
+        logger.error(f"adset_id {adset_id} could not be read (does it exist?): {e}")
+        sys.exit(1)
+    if campaign_id_override and str(data.get("campaign_id")) != str(campaign_id_override):
+        logger.error(
+            f"adset_id {adset_id} belongs to campaign {data.get('campaign_id')}, "
+            f"not the config's campaign_id {campaign_id_override} — aborting before any upload")
+        sys.exit(1)
+    status = data.get("effective_status") or data.get("status") or "UNKNOWN"
+    if status == "ACTIVE":
+        logger.warning(
+            f"Target ad set {adset_id} ('{data.get('name')}') is ACTIVE — new ads "
+            "still land PAUSED, but they go inside a live, delivering ad set "
+            "(delivery/learning-phase implications are real).")
+    return data
+
+
 def create_ad_set(account, campaign_id: str, name: str, dry_run: bool) -> str:
     if dry_run:
         logger.info(f"[DRY RUN] Would create ad set: {name}")
@@ -216,6 +248,13 @@ def main():
     daily_budget = config.get("daily_budget", 20000)
     ads = config.get("ads", [])
 
+    # Optional: target an EXISTING ad set. Omitted → today's create-new path,
+    # byte-identical. Present → skip create_ad_set and create ads inside it.
+    adset_id_override = config.get("adset_id")
+    if adset_id_override is not None and not str(adset_id_override).isdigit():
+        logger.error(f"config adset_id must be a numeric string, got: {adset_id_override!r}")
+        sys.exit(1)
+
     if not ads:
         logger.error("No ads in config file")
         sys.exit(1)
@@ -233,11 +272,19 @@ def main():
     from facebook_business.adobjects.adaccount import AdAccount
     account = AdAccount(ad_account_id)
 
-    # Derive label from ad_set_name: "Ad Set #13 - UGC - Broad - All Purchases" -> "UGC"
-    ad_set_label = ad_set_name.split(" - ")[1] if " - " in ad_set_name else "UGC"
+    # Existing-ad-set mode: verify the target up front (SDK read) so a bad id
+    # hard-fails before any campaign create or media upload — dry-run included.
+    existing_ad_set = None
+    if adset_id_override:
+        existing_ad_set = resolve_existing_ad_set(str(adset_id_override), campaign_id_override)
 
-    # Use existing campaign if campaign_id provided, otherwise create new
-    if campaign_id_override:
+    # Use existing campaign if campaign_id provided, otherwise create new.
+    # When targeting an existing ad set, never create a campaign either — the
+    # ad set already lives in one; adopt its campaign for the log/summary.
+    if adset_id_override:
+        campaign_id = campaign_id_override or existing_ad_set.get("campaign_id")
+        logger.info(f"Using campaign of existing ad set: {campaign_id}")
+    elif campaign_id_override:
         campaign_id = campaign_id_override
         logger.info(f"Using existing campaign: {campaign_name} (id: {campaign_id})")
     else:
@@ -247,12 +294,29 @@ def main():
 
     summary = {"campaign_id": campaign_id, "ad_sets": [], "total_ads": 0, "errors": []}
 
-    # Single ad set for all ads
-    logger.info(f"\nAd set: {ad_set_name} ({len(ads)} ads)")
-    adset_id = create_ad_set(account, campaign_id, ad_set_name, args.dry_run)
-    logger.info(f"  adset_id: {adset_id}")
+    # Single ad set for all ads: the config's existing one, or a new one
+    if adset_id_override:
+        adset_id = str(adset_id_override)
+        adset_display_name = existing_ad_set.get("name") or ad_set_name
+        adset_status = existing_ad_set.get("effective_status") or existing_ad_set.get("status") or "UNKNOWN"
+        logger.info(f"\nAd set: existing ad set {adset_id} ('{adset_display_name}', {adset_status}) "
+                    f"({len(ads)} ads)")
+        if args.dry_run:
+            logger.info(f"[DRY RUN] Target: existing ad set {adset_id} "
+                        f"('{adset_display_name}', {adset_status})")
+    else:
+        adset_display_name = ad_set_name
+        logger.info(f"\nAd set: {ad_set_name} ({len(ads)} ads)")
+        if args.dry_run:
+            logger.info(f"[DRY RUN] Target: would create NEW ad set '{ad_set_name}'")
+        adset_id = create_ad_set(account, campaign_id, ad_set_name, args.dry_run)
+        logger.info(f"  adset_id: {adset_id}")
 
-    adset_summary = {"name": ad_set_name, "adset_id": adset_id, "ads": []}
+    adset_summary = {"name": adset_display_name, "adset_id": adset_id, "ads": []}
+
+    # Derive label from the ad set's name: "Ad Set #13 - UGC - Broad - …" -> "UGC"
+    # (the real container's name in existing-ad-set mode; the config's otherwise)
+    ad_set_label = adset_display_name.split(" - ")[1] if " - " in adset_display_name else "UGC"
 
     for ad in ads:
         filename = ad["video_filename"]

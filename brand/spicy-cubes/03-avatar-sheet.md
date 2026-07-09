@@ -235,7 +235,7 @@ She's mourning a version of herself (grief) while feeling responsible for the re
 ### She Is Research-Native
 
 - She doesn't impulse-buy. She reads reviews, Reddit threads, studies.
-- She wants clinical doses listed. She wants mechanisms explained.
+- She wants the ingredients listed. She wants the mechanism explained — how it actually works.
 - She's been burned by influencer hype. She trusts women who say "girl, same" more than polished ads.
 
 ### She Validates on Reddit (This Is a Threat to Conversion)

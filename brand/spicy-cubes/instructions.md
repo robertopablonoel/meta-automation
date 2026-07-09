@@ -1,37 +1,42 @@
-# Spicy Cubes Dailies — Brand Instructions
+# Spicy Cubes — Brand Instructions
 
 ## BRAND IDENTITY
-Spicy Cubes Dailies, an enzyme-based gummy supplement for women's desire, energy, and mood
+Spicy Cubes, a botanical aphrodisiac cube for women's desire, energy, and mood
 
 ## BRAND DOCS
-03-avatar-sheet.pdf
-04-offer-brief.pdf
-05-necessary-beliefs.pdf
+03-avatar-sheet.md
+# NOTE (hot-peach refactor 2026-07-08): 04-offer-brief.md and 05-necessary-beliefs.md
+# are being fully rewritten from a real Hot Peach product brief. They are temporarily
+# OUT of this list because their old content is 100% Pineapple-Dailies mechanism
+# (clinical doses / 600mg / oversized gummy / no-probiotics / 365-day) — false for Hot
+# Peach. Re-add both once rewritten. Lines starting with names that don't resolve to a
+# file are skipped by the loader, but keep them commented to avoid confusion.
 
 ## COPY RULES
 - **Primary Text**: 2-4 sentences. Direct response style. Lead with a hook that stops the scroll. Use the avatar's real language (Reddit-native, raw, relatable). Must build the belief mapped to the creative concept. End with a soft CTA or curiosity gap.
-- **Headline**: Under 40 characters. MUST be a clear BENEFIT statement — what the product does for her. Think product tagline, not story hook. Examples: "Feel Like Yourself Again", "Enzymes, Not Probiotics", "Daily Balance Without the Bloat", "Feminine Balance, Done Better", "Clinical Doses, Real Balance". Do NOT write story hooks, emotional statements, or narrative lines as headlines.
-- **Description**: 40-80 characters. MUST contain social proof, offer details, or guarantee info. Combine 2-3 of: star rating, review count, money-back guarantee, free shipping, cancel anytime, clinical doses, timeline of results. Examples: "5 clinical-dose ingredients. One gummy a day. Free shipping.", "Enzyme-based. No probiotics. No bloating. 90-day guarantee.", "90-day money-back guarantee. Free shipping. Cancel anytime.", "4.8 stars. 350+ reviews. The gummy women are flocking to.", "Less bloating week 1. Better mood by week 4. One gummy daily." Do NOT write vague or emotional descriptions.
+- **Headline**: Under 40 characters. MUST be a clear BENEFIT statement — what the product does for her. Think product tagline, not story hook. Examples: "Feel Like Yourself Again", "The Cube That Works", "Desire, On Your Terms", "Feminine Balance, Done Better", "Botanicals That Actually Work". Do NOT write story hooks, emotional statements, or narrative lines as headlines.
+- **Description**: 40-80 characters. MUST contain social proof, offer details, or guarantee info. Combine 2-3 of: star rating, review count, 30-day returns, free shipping, cancel anytime, botanical ingredients, timeline of results. Examples: "Four botanical ingredients. One cube. Free shipping.", "30-day returns. Free shipping. Cancel anytime.", "4.5 stars. 273 reviews. The cube women keep reordering.", "Chili, maca, muira puama, epimedium. One cube.", "Feel it the first night. Builds with regular use." Do NOT write vague or emotional descriptions. Do NOT cite milligram doses, "clinical doses", or star ratings other than 4.5 / review counts other than 273.
 
 ## COPY STYLE GUIDELINES
 - Write like a woman talking to her best friend, not a brand talking to a customer
 - Use the avatar's real language: "I don't recognize myself anymore," "maybe this is just who I am now," "girl, same"
-- Reference specific pain points: probiotics that bloated her, doctors who dismissed her, the guilt of avoiding her partner's touch
-- Always differentiate: enzymes not probiotics, clinical doses not fairy dust, oversized gummy not cute packaging
-- Include specific details when relevant: 600mg fenugreek, 500mg tribulus, 30mg saffron, 120mg bromelain
+- Reference specific pain points: supplements that did nothing, doctors who dismissed her, the guilt of avoiding her partner's touch
+- Always differentiate: real botanical aphrodisiacs, not fairy dust; a cube you actually feel — the same night, and it builds with regular use
+- Include the real ingredients when relevant: chili pepper, muira puama, maca root, epimedium — four botanicals for desire, energy, and vitality. Do NOT cite milligram amounts or "clinical doses" (this product does not disclose doses).
+- Product facts that must stay true: it's a peach-flavored cube (not a pineapple "daily"), taken before intimacy and also builds with consistent use, 4.5 stars / 273 reviews, 30-day returns, free shipping, cancel anytime. Never claim probiotics, enzymes, "oversized gummy", specific mg doses, or a 90-day/365-day guarantee.
 - Never be preachy or clinical. Be honest, raw, and permission-giving.
 - Vary the emotional angle across variations: mix hooks, tones, and belief angles within the assigned concept
 
 ## COPY RULES (ES)
 - **Primary Text**: 2-4 oraciones. Estilo DR. Gancho que para el scroll. Usa el lenguaje real del avatar — crudo, relatable, conversacional Latin American Spanish. Construye la creencia mapeada al concepto. Termina con CTA suave o curiosity gap.
-- **Headline**: Menos de 40 caracteres. Beneficio claro y directo. Ejemplos: "Vuelve a Sentirte Tú", "Enzimas, No Probióticos", "Balance Diario Sin Hinchazón", "Balance Femenino, Hecho Mejor", "Dosis Clínicas, Balance Real". Do NOT write story hooks, emotional statements, or narrative lines as headlines.
-- **Description**: 40-80 caracteres. Prueba social, detalles de oferta, o garantía. Combina 2-3 de: calificación de estrellas, conteo de reseñas, garantía de devolución, envío gratis, cancela cuando quieras, dosis clínicas, timeline de resultados. Ejemplos: "5 ingredientes clínicos. Una gomita al día. Envío gratis.", "A base de enzimas. Sin probióticos. Sin hinchazón. Garantía 90 días.", "Garantía 90 días. Envío gratis. Cancela cuando quieras.", "4.8 estrellas. 350+ reseñas. La gomita que todas quieren.", "Menos hinchazón semana 1. Mejor ánimo semana 4. Una gomita." Do NOT write vague or emotional descriptions.
+- **Headline**: Menos de 40 caracteres. Beneficio claro y directo. Ejemplos: "Vuelve a Sentirte Tú", "El Cubo Que Sí Funciona", "Deseo, En Tus Términos", "Balance Femenino, Hecho Mejor", "Botánicos Que Sí Funcionan". Do NOT write story hooks, emotional statements, or narrative lines as headlines.
+- **Description**: 40-80 caracteres. Prueba social, detalles de oferta, o garantía. Combina 2-3 de: calificación de estrellas, conteo de reseñas, devoluciones 30 días, envío gratis, cancela cuando quieras, ingredientes botánicos, timeline de resultados. Ejemplos: "Cuatro ingredientes botánicos. Un cubo. Envío gratis.", "Devoluciones 30 días. Envío gratis. Cancela cuando quieras.", "4.5 estrellas. 273 reseñas. El cubo que todas repiten.", "Chili, maca, muira puama, epimedium. Un cubo." Do NOT write vague or emotional descriptions. No cites dosis en mg, "dosis clínicas", ni calificaciones distintas a 4.5 / reseñas distintas a 273.
 
 ## COPY STYLE GUIDELINES (ES)
 - Escribe como una mujer hablándole a su mejor amiga, no como una marca hablándole a una clienta
 - Usa el lenguaje real del avatar: "Ya no me reconozco," "tal vez así soy ahora," "amiga, igual yo"
-- Referencia puntos de dolor específicos: los probióticos que la hinchaban, los doctores que la ignoraron, la culpa de evitar el contacto con su pareja
-- Siempre diferencia: enzimas no probióticos, dosis clínicas no polvos mágicos, gomita grande no empaque bonito
-- Incluye detalles específicos cuando sea relevante: 600mg fenogreco, 500mg tribulus, 30mg azafrán, 120mg bromelina
+- Referencia puntos de dolor específicos: los suplementos que no hicieron nada, los doctores que la ignoraron, la culpa de evitar el contacto con su pareja
+- Siempre diferencia: afrodisíacos botánicos reales, no polvos mágicos; un cubo que de verdad sientes — la misma noche, y que mejora con el uso constante
+- Incluye los ingredientes reales cuando sea relevante: chili, muira puama, maca, epimedium — cuatro botánicos para deseo, energía y vitalidad. No cites cantidades en mg ni "dosis clínicas" (este producto no revela dosis).
 - Nunca seas moralista ni clínica. Sé honesta, cruda y da permiso.
 - Varía el ángulo emocional entre variaciones: mezcla hooks, tonos y ángulos de creencia dentro del concepto asignado

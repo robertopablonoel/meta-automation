@@ -242,7 +242,7 @@ def main():
     with open(config_path) as f:
         config = json.load(f)
 
-    campaign_name = config.get("campaign_name", "Spicy Cubes Dailies - Auto Generated")
+    campaign_name = config.get("campaign_name", "Spicy Cubes Hot Peach - Auto Generated")
     campaign_id_override = config.get("campaign_id")
     ad_set_name = config.get("ad_set_name", "Batch #1")
     daily_budget = config.get("daily_budget", 20000)

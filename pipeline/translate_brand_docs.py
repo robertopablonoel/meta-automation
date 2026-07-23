@@ -56,7 +56,7 @@ def translate_text(client: anthropic.Anthropic, text: str, doc_name: str, max_re
                         f"- Preserve ALL formatting, structure, headers, and bullet points exactly\n"
                         f"- Keep marketing terminology natural in Spanish (not literal translations)\n"
                         f"- Use 'tú' form (informal), not 'usted'\n"
-                        f"- Keep brand name 'Spicy Cubes Dailies' untranslated\n"
+                        f"- Keep brand name 'Spicy Cubes' untranslated\n"
                         f"- Keep ingredient names in their common Spanish forms where they exist\n"
                         f"- Do NOT add any commentary — output ONLY the translated text\n\n"
                         f"---\n\n"

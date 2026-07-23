@@ -19,6 +19,37 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 
+# ── Format-aware tone: "discovered repost / self-aware social proof" ──────────
+# Injected into Pass 4 copy-gen ONLY for UGC-format concept groups (real-person
+# testimonial videos). It is an AVAILABLE tone in the palette — the model uses it
+# where it fits and may use it in 0, 1, or several of the variations. It is never
+# forced, never added as an extra variation, and never applied to static/brand
+# creatives.
+UGC_REPOST_TONE_GUIDANCE = (
+    "UGC-FORMAT TONE — \"Discovered Repost / Self-Aware Social Proof\" "
+    "(SOFT FLOOR — bias toward surfacing it):\n"
+    "These creatives are real-person UGC testimonials. Alongside the standard "
+    "angles, write some variations in a \"discovered repost\" voice — where the "
+    "brand steps outside the ad and comments on the video itself instead of "
+    "restating the pitch. The brand is reacting to HER, not selling over her.\n"
+    "- Register examples: \"We didn't script this. She just... said all that.\" / "
+    "\"This video's been making the rounds and honestly, she explains it better than "
+    "we ever could.\" / \"When a customer reviews your product better than your own "
+    "marketing team, you repost it.\"\n"
+    "- SOFT FLOOR: aim to write AT LEAST ONE of your variations for this concept in "
+    "the discovered-repost frame whenever the source testimonial is quotable (this "
+    "creator batch generally is). This is a strong bias, not a hard mandate — if a "
+    "concept genuinely doesn't support the frame, you may skip it. But do NOT use it "
+    "in every variation, and do NOT add an extra variation for it: it REPLACES a "
+    "standard variation's angle, it never adds one.\n"
+    "- Compliance guardrail (HARD): these run as ads with a visible \"Paid "
+    "partnership\" label. The wink is fine; a literal false-organic claim is not. "
+    "Lean \"we had to repost this\" / \"she said it better than we could.\" NEVER "
+    "imply it's unpaid or accidentally found — no \"totally unpaid,\" no \"we just "
+    "stumbled on this,\" no implied fake or organic endorsement."
+)
+
+
 def _fix_schema_for_api(schema: dict) -> dict:
     """Recursively add additionalProperties: false to all object types in a JSON schema.
 
@@ -506,9 +537,9 @@ async def classify_media_item(
                 f"into exactly ONE of these categories: {categories_str}\n\n"
                 f"IMPORTANT: Classify based on the video's OPENING HOOK — the first thing "
                 f"the viewer sees and hears. What belief or angle does the hook lead with? "
-                f"Do NOT classify based on mechanism language that appears later in the video "
-                f"(most videos eventually mention enzymes vs probiotics — that's not what "
-                f"makes them strategically distinct).\n\n"
+                f"Do NOT classify based on the shared product talking points that appear later "
+                f"in the video (most videos eventually converge on the same ingredients, how to "
+                f"take it, and results — that's not what makes the hooks strategically distinct).\n\n"
                 f"Opening hook transcript:\n{hook_excerpt}\n\n"
                 f"Return the category name and your reasoning.{lang_suffix}"
             )
@@ -953,6 +984,11 @@ async def generate_concept_copy(
         media_list = ", ".join(display_names)
         has_videos = any(n.endswith(".mp4") or n.endswith(".mov") for n in display_names)
         video_note = " Some are video thumbnails — copy should work for both image and video ads." if has_videos else ""
+        # Format-aware tone: UGC-format concept groups (real-person testimonial videos,
+        # non-static runs) get the "discovered repost" voice as an AVAILABLE palette option.
+        creative_format = "static" if static_mode else ("ugc" if has_videos else "image")
+        if creative_format == "ugc":
+            video_note += "\n\n" + UGC_REPOST_TONE_GUIDANCE
 
         # Build overlay copy context block for static ads
         overlay_context = ""

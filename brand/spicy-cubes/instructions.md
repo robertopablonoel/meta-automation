@@ -5,12 +5,8 @@ Spicy Cubes, a botanical aphrodisiac cube for women's desire, energy, and mood
 
 ## BRAND DOCS
 03-avatar-sheet.md
-# NOTE (hot-peach refactor 2026-07-08): 04-offer-brief.md and 05-necessary-beliefs.md
-# are being fully rewritten from a real Hot Peach product brief. They are temporarily
-# OUT of this list because their old content is 100% Pineapple-Dailies mechanism
-# (clinical doses / 600mg / oversized gummy / no-probiotics / 365-day) — false for Hot
-# Peach. Re-add both once rewritten. Lines starting with names that don't resolve to a
-# file are skipped by the loader, but keep them commented to avoid confusion.
+04-offer-brief.md
+05-necessary-beliefs.md
 
 ## COPY RULES
 - **Primary Text**: 2-4 sentences. Direct response style. Lead with a hook that stops the scroll. Use the avatar's real language (Reddit-native, raw, relatable). Must build the belief mapped to the creative concept. End with a soft CTA or curiosity gap.
@@ -24,6 +20,7 @@ Spicy Cubes, a botanical aphrodisiac cube for women's desire, energy, and mood
 - Always differentiate: real botanical aphrodisiacs, not fairy dust; a cube you actually feel — the same night, and it builds with regular use
 - Include the real ingredients when relevant: chili pepper, muira puama, maca root, epimedium — four botanicals for desire, energy, and vitality. Do NOT cite milligram amounts or "clinical doses" (this product does not disclose doses).
 - Product facts that must stay true: it's a peach-flavored cube (not a pineapple "daily"), taken before intimacy and also builds with consistent use, 4.5 stars / 273 reviews, 30-day returns, free shipping, cancel anytime. Never claim probiotics, enzymes, "oversized gummy", specific mg doses, or a 90-day/365-day guarantee.
+- "Pineapple party" is ALLOWED and encouraged: it's Jamie Lyn's creator slang for a Spicy Cubes intimacy night and runs all through the UGC — use it naturally where it fits. The only pineapple guardrails: never call the product's FLAVOR pineapple (the flavor is peach), and never reference the discontinued "Spicy Cubes Dailies (Pineapple)" product. The slang euphemism is fine; the old product and the wrong flavor are not.
 - Never be preachy or clinical. Be honest, raw, and permission-giving.
 - Vary the emotional angle across variations: mix hooks, tones, and belief angles within the assigned concept
 
@@ -38,5 +35,6 @@ Spicy Cubes, a botanical aphrodisiac cube for women's desire, energy, and mood
 - Referencia puntos de dolor específicos: los suplementos que no hicieron nada, los doctores que la ignoraron, la culpa de evitar el contacto con su pareja
 - Siempre diferencia: afrodisíacos botánicos reales, no polvos mágicos; un cubo que de verdad sientes — la misma noche, y que mejora con el uso constante
 - Incluye los ingredientes reales cuando sea relevante: chili, muira puama, maca, epimedium — cuatro botánicos para deseo, energía y vitalidad. No cites cantidades en mg ni "dosis clínicas" (este producto no revela dosis).
+- "Pineapple party" (o "fiesta piña") está PERMITIDO y se fomenta: es la jerga de la creadora Jamie Lyn para una noche íntima con Spicy Cubes y aparece por todo el UGC — úsalo con naturalidad donde encaje. Las únicas restricciones con "piña": nunca describas el SABOR del producto como piña (el sabor es durazno), y nunca menciones el producto descontinuado "Spicy Cubes Dailies (Pineapple)". El eufemismo de la jerga está bien; el producto viejo y el sabor equivocado no.
 - Nunca seas moralista ni clínica. Sé honesta, cruda y da permiso.
 - Varía el ángulo emocional entre variaciones: mezcla hooks, tonos y ángulos de creencia dentro del concepto asignado

@@ -235,50 +235,91 @@ def create_partnership_creative(account, image_hash: str, ad: dict, partnership:
     ad account's owned-identity check (which fails with 1815199/1341012)."""
     name = Path(ad["video_filename"]).stem
     is_partnership = bool(partnership and partnership.get("creator_fb_page_id"))
+    # Multi-headline / multi-body support (Cole 2026-08-04): headlines/bodies
+    # LISTS override the single headline/primary_text. >1 of either on a VIDEO
+    # => Advantage+ asset_feed_spec (Meta's native multiple-text-option feature;
+    # Meta rotates/optimizes) instead of single-title video_data. A single entry
+    # falls back to the original object_story_spec path (back-compat).
+    headlines = [h for h in (ad.get("headlines") or [ad.get("headline")]) if h]
+    bodies = [b for b in (ad.get("bodies") or [ad.get("primary_text")]) if b]
+    description = ad.get("description", "") or ""
+    is_video = isinstance(image_hash, dict) and bool(image_hash.get("video_id"))
+    multi = len(headlines) > 1 or len(bodies) > 1
     if dry_run:
         kind = "PARTNERSHIP" if is_partnership else "BRAND"
-        logger.info(f"[DRY RUN] Would create {kind} creative for: {name}")
+        fmt = "asset_feed_spec MULTI" if (multi and is_video) else "single-title"
+        logger.info(f"[DRY RUN] Would create {kind} creative [{fmt}] for: {name}")
         if is_partnership:
             logger.info(f"  creator: {partnership.get('handle','?')} "
                         f"(ig {partnership['instagram_user_id']}, page {partnership['creator_fb_page_id']}) "
                         f"| sponsors: ig {partnership['sponsor_instagram_id']}, page {partnership['sponsor_page_id']}")
-        logger.info(f"  primary_text: {ad['primary_text'][:60]}...")
-        logger.info(f"  headline: {ad['headline']}")
+        logger.info(f"  bodies({len(bodies)}): {bodies[0][:55]}...")
+        logger.info(f"  headlines({len(headlines)}): {headlines}")
         return "DRY_RUN_CREATIVE_ID"
     from facebook_business.adobjects.adcreative import AdCreative
-    # media dispatch: image -> link_data (validated 2026-07-06),
-    # video -> video_data (modeled off live Campaign-3 video ads, read 2026-07-08)
-    if isinstance(image_hash, dict) and image_hash.get("video_id"):
-        story_data_key = "video_data"
-        story_data = {
+    page_id = (str(partnership["creator_fb_page_id"]) if is_partnership
+               else str(partnership["page_id"]))
+    ig_id = str(partnership["instagram_user_id"])
+    if is_video and multi:
+        # Advantage+ / "Standard Enhancements" multi-text on a STANDARD ad:
+        # the BASE creative (video + link/CTA) lives in object_story_spec.video_data
+        # (this is what carries the destination link — asset_feed_spec video assets
+        # have no link field, hence error 2061015 when the base is omitted), and
+        # asset_feed_spec supplies the multiple title/body OPTIONS with
+        # optimization_type=DEGREES_OF_FREEDOM (FLEX, not Dynamic Creative -> runs
+        # in a non-dynamic ad set, multiple ads per set OK).
+        base_video = {
             "video_id": image_hash["video_id"],
             "image_hash": image_hash["thumb_hash"],
-            "title": ad["headline"],
-            "message": ad["primary_text"],
-            "link_description": ad.get("description", ""),
+            "title": headlines[0],
+            "message": bodies[0],
+            "link_description": description,
             "call_to_action": {"type": "SHOP_NOW", "value": {"link": landing_url}},
+        }
+        afs = {
+            "optimization_type": "DEGREES_OF_FREEDOM",
+            "titles": [{"text": h} for h in headlines],
+            "bodies": [{"text": b} for b in bodies],
+        }
+        if description:
+            afs["descriptions"] = [{"text": description}]
+        params = {
+            AdCreative.Field.name: f"Creative - {name}",
+            AdCreative.Field.object_story_spec: {"page_id": page_id,
+                                                 "instagram_user_id": ig_id,
+                                                 "video_data": base_video},
+            "asset_feed_spec": afs,
+            AdCreative.Field.url_tags: URL_TAGS,
         }
     else:
-        story_data_key = "link_data"
-        story_data = {
-            "link": landing_url,
-            "message": ad["primary_text"],
-            "name": ad["headline"],
-            "description": ad.get("description", ""),
-            "image_hash": image_hash,
-            "call_to_action": {"type": "SHOP_NOW", "value": {"link": landing_url}},
+        # single-title path (unchanged): video -> video_data, image -> link_data
+        if is_video:
+            story_data_key = "video_data"
+            story_data = {
+                "video_id": image_hash["video_id"],
+                "image_hash": image_hash["thumb_hash"],
+                "title": headlines[0],
+                "message": bodies[0],
+                "link_description": description,
+                "call_to_action": {"type": "SHOP_NOW", "value": {"link": landing_url}},
+            }
+        else:
+            story_data_key = "link_data"
+            story_data = {
+                "link": landing_url,
+                "message": bodies[0],
+                "name": headlines[0],
+                "description": description,
+                "image_hash": image_hash,
+                "call_to_action": {"type": "SHOP_NOW", "value": {"link": landing_url}},
+            }
+        params = {
+            AdCreative.Field.name: f"Creative - {name}",
+            AdCreative.Field.object_story_spec: {"page_id": page_id,
+                                                 "instagram_user_id": ig_id,
+                                                 story_data_key: story_data},
+            AdCreative.Field.url_tags: URL_TAGS,
         }
-    spec = {
-        "page_id": str(partnership["creator_fb_page_id"]) if is_partnership
-                   else str(partnership["page_id"]),
-        "instagram_user_id": str(partnership["instagram_user_id"]),
-        story_data_key: story_data,
-    }
-    params = {
-        AdCreative.Field.name: f"Creative - {name}",
-        AdCreative.Field.object_story_spec: spec,
-        AdCreative.Field.url_tags: URL_TAGS,
-    }
     if is_partnership:
         params["instagram_branded_content"] = {"sponsor_id": str(partnership["sponsor_instagram_id"])}
         params["facebook_branded_content"] = {"sponsor_page_id": str(partnership["sponsor_page_id"])}

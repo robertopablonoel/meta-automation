@@ -247,7 +247,7 @@ def create_partnership_creative(account, image_hash: str, ad: dict, partnership:
     multi = len(headlines) > 1 or len(bodies) > 1
     if dry_run:
         kind = "PARTNERSHIP" if is_partnership else "BRAND"
-        fmt = "asset_feed_spec MULTI" if (multi and is_video) else "single-title"
+        fmt = "asset_feed_spec MULTI" if multi else "single-title"
         logger.info(f"[DRY RUN] Would create {kind} creative [{fmt}] for: {name}")
         if is_partnership:
             logger.info(f"  creator: {partnership.get('handle','?')} "
@@ -260,22 +260,35 @@ def create_partnership_creative(account, image_hash: str, ad: dict, partnership:
     page_id = (str(partnership["creator_fb_page_id"]) if is_partnership
                else str(partnership["page_id"]))
     ig_id = str(partnership["instagram_user_id"])
-    if is_video and multi:
+    if multi:
         # Advantage+ / "Standard Enhancements" multi-text on a STANDARD ad:
-        # the BASE creative (video + link/CTA) lives in object_story_spec.video_data
-        # (this is what carries the destination link — asset_feed_spec video assets
-        # have no link field, hence error 2061015 when the base is omitted), and
-        # asset_feed_spec supplies the multiple title/body OPTIONS with
-        # optimization_type=DEGREES_OF_FREEDOM (FLEX, not Dynamic Creative -> runs
-        # in a non-dynamic ad set, multiple ads per set OK).
-        base_video = {
-            "video_id": image_hash["video_id"],
-            "image_hash": image_hash["thumb_hash"],
-            "title": headlines[0],
-            "message": bodies[0],
-            "link_description": description,
-            "call_to_action": {"type": "SHOP_NOW", "value": {"link": landing_url}},
-        }
+        # the BASE creative (media + link/CTA) lives in object_story_spec
+        # (video_data for video, link_data for a static image) — this is what
+        # carries the destination link; asset_feed_spec media assets have no link
+        # field, hence error 2061015 if the base is omitted. asset_feed_spec then
+        # supplies the multiple title/body OPTIONS with optimization_type=
+        # DEGREES_OF_FREEDOM (FLEX, not Dynamic Creative -> runs in a non-dynamic
+        # ad set, multiple ads per set OK). Validated live: video 2026-08-05.
+        if is_video:
+            story_data_key = "video_data"
+            base_story = {
+                "video_id": image_hash["video_id"],
+                "image_hash": image_hash["thumb_hash"],
+                "title": headlines[0],
+                "message": bodies[0],
+                "link_description": description,
+                "call_to_action": {"type": "SHOP_NOW", "value": {"link": landing_url}},
+            }
+        else:
+            story_data_key = "link_data"
+            base_story = {
+                "link": landing_url,
+                "name": headlines[0],
+                "message": bodies[0],
+                "description": description,
+                "image_hash": image_hash,
+                "call_to_action": {"type": "SHOP_NOW", "value": {"link": landing_url}},
+            }
         afs = {
             "optimization_type": "DEGREES_OF_FREEDOM",
             "titles": [{"text": h} for h in headlines],
@@ -287,7 +300,7 @@ def create_partnership_creative(account, image_hash: str, ad: dict, partnership:
             AdCreative.Field.name: f"Creative - {name}",
             AdCreative.Field.object_story_spec: {"page_id": page_id,
                                                  "instagram_user_id": ig_id,
-                                                 "video_data": base_video},
+                                                 story_data_key: base_story},
             "asset_feed_spec": afs,
             AdCreative.Field.url_tags: URL_TAGS,
         }

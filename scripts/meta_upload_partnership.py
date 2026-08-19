@@ -502,7 +502,9 @@ def main():
                 account, image_hash, ad, identity, landing_url, args.dry_run)
             logger.info(f"  creative_id: {creative_id}")
             hook = Path(filename).stem.split("-", 1)[-1].strip("_") or "Var1"
-            ad_name = f"{label}//{ad['creative_concept']}//{hook}//PDP"
+            # ad_name override (new naming schemes, e.g. Batch #2_..._Alex_V1);
+            # falls back to the label//concept//hook//PDP convention.
+            ad_name = ad.get("ad_name") or f"{label}//{ad.get('creative_concept','')}//{hook}//PDP"
             ad_id = create_ad(account, adset_id, creative_id, ad_name, args.dry_run)
             logger.info(f"  ad_id: {ad_id} | name: {ad_name}")
             summary["ad_sets"][0]["ads"].append({"filename": filename, "ad_id": ad_id})

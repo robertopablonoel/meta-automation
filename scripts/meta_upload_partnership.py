@@ -419,8 +419,13 @@ def main():
 
     ad_account_id, env_page_id, landing_url = init_api()
     ad_account_id = ad_account_id if ad_account_id.startswith("act_") else f"act_{ad_account_id}"
+    # config landing_url override (e.g. a language-specific lander instead of the
+    # env PDP); falls back to LANDING_PAGE_URL from .env.
+    if config.get("landing_url"):
+        landing_url = config["landing_url"]
+        logger.info(f"  landing_url override: {landing_url}")
     if not landing_url:
-        logger.error("LANDING_PAGE_URL missing from .env")
+        logger.error("LANDING_PAGE_URL missing from .env and config")
         sys.exit(1)
     if partnership:
         logger.info(f"  creative identity: creator page {partnership['creator_fb_page_id']} "

@@ -321,11 +321,12 @@ def create_partnership_creative(account, image_hash: str, ad: dict, partnership:
             story_data = {
                 "link": landing_url,
                 "message": bodies[0],
-                "name": headlines[0],
                 "description": description,
                 "image_hash": image_hash,
                 "call_to_action": {"type": "SHOP_NOW", "value": {"link": landing_url}},
             }
+            if headlines:  # headline optional (BOF statics carry the hook in-image)
+                story_data["name"] = headlines[0]
         params = {
             AdCreative.Field.name: f"Creative - {name}",
             AdCreative.Field.object_story_spec: {"page_id": page_id,

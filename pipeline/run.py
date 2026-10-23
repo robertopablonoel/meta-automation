@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Meta Ad Copy Automation Pipeline for Spicy Cubes Dailies.
+Meta Ad Copy Automation Pipeline for Spicy Cubes Hot Peach.
 
 Visual-first pipeline — sub-groups creatives by visual similarity BEFORE strategic classification:
   Pass 0  — Preprocess videos: extract frames + audio transcripts (ffmpeg + faster-whisper)
@@ -833,9 +833,16 @@ async def run_generation(
                     items.append(enriched)
             groups[concept] = items
 
+        # filename_map maps thumbnail visual_path -> original filename (e.g. .mp4),
+        # so copy-gen can detect UGC-video concept groups (creative_format="ugc")
+        # and inject the format-aware discovered-repost tone. Without it, display
+        # names fall back to .jpg thumbnails and the UGC gate never fires.
+        filename_map = _build_filename_map(descriptions) if descriptions else None
+
         logger.info(f"Pass 4: Generating copy for {len(groups)} concepts (shared across sub-groups)...")
         raw_results = await generate_all_concept_copy(
             client, system_messages, groups, cat_lookup,
+            filename_map=filename_map,
             language=language, static_mode=static_mode,
         )
 
@@ -1334,7 +1341,7 @@ async def async_main(args):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Meta Ad Copy Automation Pipeline for Spicy Cubes Dailies"
+        description="Meta Ad Copy Automation Pipeline for Spicy Cubes Hot Peach"
     )
     group = parser.add_mutually_exclusive_group()
     group.add_argument(

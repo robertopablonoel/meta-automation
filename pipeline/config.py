@@ -12,16 +12,21 @@ OUTPUT_JSON = OUTPUT_DIR / "ad_copy_output.json"
 OUTPUT_CSV = OUTPUT_DIR / "ad_copy_output.csv"
 CONSOLIDATED_JSON = OUTPUT_DIR / "consolidated.json"
 
-# Brand doc PDFs (English)
-AVATAR_SHEET_PDF = BASE_DIR / "brand" / "03-avatar-sheet.pdf"
-OFFER_BRIEF_PDF = BASE_DIR / "brand" / "04-offer-brief.pdf"
-NECESSARY_BELIEFS_PDF = BASE_DIR / "brand" / "05-necessary-beliefs.pdf"
+# ── Brand ──────────────────────────────────────────────────────────────────
+BRAND = os.getenv("BRAND", "spicy-cubes")
+BRAND_DIR = BASE_DIR / "brand" / BRAND
 
-# Brand docs (Spanish)
-BRAND_DIR_ES = BASE_DIR / "brand" / "es"
-AVATAR_SHEET_ES = BRAND_DIR_ES / "03-avatar-sheet.txt"
-OFFER_BRIEF_ES = BRAND_DIR_ES / "04-offer-brief.txt"
-NECESSARY_BELIEFS_ES = BRAND_DIR_ES / "05-necessary-beliefs.txt"
+
+def _read_brand_display_name() -> str:
+    instructions_path = BRAND_DIR / "instructions.md"
+    if instructions_path.exists():
+        for line in instructions_path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("# "):
+                return line[2:].split("—")[0].strip()
+    return BRAND.replace("-", " ").title()
+
+
+BRAND_DISPLAY_NAME = _read_brand_display_name()
 
 # ── Language ──────────────────────────────────────────────────────────────
 PIPELINE_LANGUAGE = os.getenv("PIPELINE_LANGUAGE", "auto")

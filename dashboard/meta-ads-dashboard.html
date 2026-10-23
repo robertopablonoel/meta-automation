@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Spicy Cubes — Meta Ads Dashboard</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -287,6 +286,51 @@
     color: #fdfaf1;
   }
 
+  .export-btn.success {
+    background: #2d6a2d;
+    border-color: #2d6a2d;
+    color: #fdfaf1;
+    cursor: default;
+  }
+
+  .export-btn.error {
+    background: #ff473b;
+    border-color: #ff473b;
+    color: #fdfaf1;
+  }
+
+  .campaign-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-right: 4px;
+  }
+
+  .campaign-inputs label {
+    color: #FCA5A5;
+    font-size: 10px;
+    font-family: monospace;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .campaign-inputs input {
+    background: rgba(253,250,241,0.12);
+    border: 1px solid rgba(253,250,241,0.3);
+    color: #fdfaf1;
+    font-family: monospace;
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    width: 220px;
+    outline: none;
+  }
+
+  .campaign-inputs input:focus {
+    border-color: rgba(253,250,241,0.7);
+    background: rgba(253,250,241,0.18);
+  }
+
   .error-state {
     text-align: center;
     padding: 80px 32px;
@@ -418,8 +462,18 @@
     <div class="subtitle">Meta Ads Copy Dashboard</div>
   </div>
   <div style="display:flex;align-items:center;gap:12px">
+    <div class="campaign-inputs">
+      <div>
+        <label>Campaign</label>
+        <input type="text" id="campaignName" value="Spicy Cubes Dailies - English UGC" />
+      </div>
+      <div>
+        <label>Ad Set</label>
+        <input type="text" id="adSetName" value="Batch #4" />
+      </div>
+    </div>
     <div class="badge" id="badge">Loading...</div>
-    <button class="export-btn" onclick="exportToMeta()">↓ Export for Meta</button>
+    <button class="export-btn" id="exportBtn" onclick="exportToConfig()">↓ Export for Meta</button>
   </div>
 </header>
 
@@ -572,123 +626,56 @@ function escapeHtml(str) {
 }
 
 // ── Meta Export ───────────────────────────────────────────────────────────
-async function exportToMeta() {
-  const CAMPAIGN    = 'Spicy Cubes Dailies - English UGC';
-  const CAMPAIGN_ID = '120241040507080467';
-  const AD_SET      = 'Batch #3';
+async function exportToConfig() {
+  const btn = document.getElementById('exportBtn');
+  const campaignName = document.getElementById('campaignName').value.trim() || 'Spicy Cubes Dailies - English UGC';
+  const adSetName = document.getElementById('adSetName').value.trim() || 'Batch #4';
 
-  // Fields to clear — keep Campaign ID so Meta routes to the existing campaign;
-  // clear Ad Set ID so Meta looks up by name instead of pointing to old ad set
-  const CLEAR_FIELDS = new Set([
-    'Ad Set ID', 'Ad ID',
-    'Preview Link', 'Instagram Preview Link', 'Permalink', 'Story ID',
-  ]);
-
-  // Fields to overwrite with our data (everything else inherits from the template row)
-  const OVERWRITE = {
-    'Campaign ID':       ()        => CAMPAIGN_ID,
-    'Campaign Name':     ()        => CAMPAIGN,
-    'Campaign Status':   ()        => 'PAUSED',
-    'Ad Set Name':       ()        => AD_SET,
-    'Ad Set Run Status': ()       => 'PAUSED',
-    'Ad Status':         ()       => 'PAUSED',
-    'Ad Name':           (cat)    => (cat.ad_filenames[0] || '').replace(/\.[^.]+$/, ''),
-    'Body':              (cat, v) => v.primary_text || '',
-    'Title':             (cat, v) => v.headline || '',
-    'Link Description':  (cat, v) => v.description || '',
-    'Video ID':          (cat)    => cat.videos.map(f => videoIds[f] || '').filter(Boolean).join(', '),
-    'Video File Name':   (cat)    => cat.ad_filenames.join(', '),
-    'Link':              ()       => 'https://www.spicycubes.com/products/spicy-cubes-pineapple-dailies-for-her-2',
-  };
-
-  // Load the real exported file as the base
-  let wb;
-  try {
-    const res = await fetch('meta_export_template.xlsx');
-    const buf = await res.arrayBuffer();
-    wb = XLSX.read(buf, { type: 'array' });
-  } catch (e) {
-    alert('Could not load export template: ' + e.message);
-    return;
-  }
-
-  const ws = wb.Sheets['Sheet1'];
-  const range = XLSX.utils.decode_range(ws['!ref']);
-
-  // Build column index map from header row
-  const colMap = {};
-  for (let c = range.s.c; c <= range.e.c; c++) {
-    const cell = ws[XLSX.utils.encode_cell({ r: 0, c })];
-    if (cell && cell.v) colMap[cell.v] = c;
-  }
-
-  // Clone row 2 (first real ad) as the base template for all new rows
-  const templateRow = {};
-  for (let c = range.s.c; c <= range.e.c; c++) {
-    const cell = ws[XLSX.utils.encode_cell({ r: 1, c })];
-    templateRow[c] = cell ? { ...cell } : null;
-  }
-
-  // Delete all existing data rows (keep only header)
-  for (let r = 1; r <= range.e.r; r++) {
-    for (let c = range.s.c; c <= range.e.c; c++) {
-      delete ws[XLSX.utils.encode_cell({ r, c })];
-    }
-  }
-
-  // Write one row per video (each video in a category gets its own ad row)
-  let rowIdx = 1;
+  const ads = [];
   Object.keys(catStore).forEach(ci => {
-    const cat = { ...catStore[ci], _ci: ci };
+    const cat = catStore[ci];
     const vi = activeVar[ci] ?? 0;
     const v = varStore[`${ci}-${vi}`];
     if (!v) return;
 
-    cat.ad_filenames.forEach((adFilename, vidIdx) => {
-      // Single-video cat proxy for OVERWRITE functions
-      const singleCat = { ...cat, ad_filenames: [adFilename], videos: [cat.videos[vidIdx] || ''] };
-
-      // Clone template row
-      for (let c = range.s.c; c <= range.e.c; c++) {
-        if (templateRow[c]) ws[XLSX.utils.encode_cell({ r: rowIdx, c })] = { ...templateRow[c] };
-      }
-
-      // Clear ID fields
-      CLEAR_FIELDS.forEach(header => {
-        const c = colMap[header];
-        if (c !== undefined) delete ws[XLSX.utils.encode_cell({ r: rowIdx, c })];
+    cat.ad_filenames.forEach(filename => {
+      ads.push({
+        creative_concept: cat.concept,
+        video_filename: filename,
+        primary_text: v.primary_text || '',
+        headline: v.headline || '',
+        description: v.description || '',
       });
-
-      // Overwrite with our data
-      Object.entries(OVERWRITE).forEach(([header, fn]) => {
-        const c = colMap[header];
-        if (c === undefined) return;
-        ws[XLSX.utils.encode_cell({ r: rowIdx, c })] = { t: 's', v: fn(singleCat, v) };
-      });
-
-      rowIdx++;
     });
   });
 
-  range.e.r = rowIdx - 1;
-  ws['!ref'] = XLSX.utils.encode_range(range);
+  if (ads.length === 0) {
+    btn.textContent = 'No ads to export';
+    btn.classList.add('error');
+    setTimeout(() => { btn.textContent = '↓ Export for Meta'; btn.classList.remove('error'); }, 3000);
+    return;
+  }
 
-  const lang = uiLang !== 'auto' ? `_${uiLang}` : '';
-  XLSX.writeFile(wb, `meta_bulk_upload${lang}.xlsx`);
+  const config = { campaign_name: campaignName, ad_set_name: adSetName, daily_budget: 20000, ads };
 
-  // Also download video_ids.json if any videos are missing IDs
-  const missingIds = {};
-  Object.values(catStore).forEach(cat => {
-    cat.videos.forEach(filename => {
-      if (!videoIds[filename]) missingIds[filename] = '';
+  try {
+    const res = await fetch('http://localhost:8765/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
     });
-  });
-  if (Object.keys(missingIds).length > 0) {
-    const blob = new Blob([JSON.stringify(missingIds, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'video_ids.json';
-    a.click();
+    const json = await res.json();
+    if (json.ok) {
+      btn.textContent = `✓ Saved ${ads.length} ads — run python -m scripts.meta_upload`;
+      btn.classList.add('success');
+      setTimeout(() => { btn.textContent = '↓ Export for Meta'; btn.classList.remove('success'); }, 8000);
+    } else {
+      throw new Error(json.error || 'Unknown error');
+    }
+  } catch (e) {
+    btn.textContent = `Error: ${e.message}`;
+    btn.classList.add('error');
+    setTimeout(() => { btn.textContent = '↓ Export for Meta'; btn.classList.remove('error'); }, 5000);
   }
 }
 

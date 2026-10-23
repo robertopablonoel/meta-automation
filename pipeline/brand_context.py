@@ -1,13 +1,57 @@
+from pathlib import Path
+
 import pdfplumber
 
-from .config import (
-    AVATAR_SHEET_PDF, OFFER_BRIEF_PDF, NECESSARY_BELIEFS_PDF,
-    AVATAR_SHEET_ES, OFFER_BRIEF_ES, NECESSARY_BELIEFS_ES,
-)
+from .config import BRAND_DIR
 
+
+# ── Brand instructions loader ─────────────────────────────────────────────
+
+_brand_instructions: dict | None = None
+
+
+def _parse_instructions(text: str) -> dict[str, str]:
+    sections: dict[str, str] = {}
+    current_key: str | None = None
+    current_lines: list[str] = []
+    for line in text.splitlines():
+        if line.startswith("## "):
+            if current_key is not None:
+                sections[current_key] = "\n".join(current_lines).strip()
+            current_key = line[3:].strip()
+            current_lines = []
+        elif current_key is not None:
+            current_lines.append(line)
+    if current_key is not None:
+        sections[current_key] = "\n".join(current_lines).strip()
+    return sections
+
+
+def load_brand_instructions() -> dict[str, str]:
+    global _brand_instructions
+    if _brand_instructions is None:
+        path = BRAND_DIR / "instructions.md"
+        if not path.exists():
+            raise FileNotFoundError(f"Brand instructions not found: {path}")
+        _brand_instructions = _parse_instructions(path.read_text(encoding="utf-8"))
+    return _brand_instructions
+
+
+def _get_copy_rules(language: str) -> str:
+    instructions = load_brand_instructions()
+    lang_key = f"COPY RULES ({language.upper()})"
+    return instructions.get(lang_key) or instructions.get("COPY RULES", "")
+
+
+def _get_copy_style(language: str) -> str:
+    instructions = load_brand_instructions()
+    lang_key = f"COPY STYLE GUIDELINES ({language.upper()})"
+    return instructions.get(lang_key) or instructions.get("COPY STYLE GUIDELINES", "")
+
+
+# ── Brand context loader ──────────────────────────────────────────────────
 
 def extract_pdf_text(pdf_path: str) -> str:
-    """Extract all text from a PDF using pdfplumber."""
     pages = []
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
@@ -18,61 +62,74 @@ def extract_pdf_text(pdf_path: str) -> str:
 
 
 def load_brand_context(language: str = "en") -> str:
-    """Load and concatenate all brand docs into a single text block.
+    instructions = load_brand_instructions()
 
-    Args:
-        language: "en" loads from English PDFs, "es" loads from Spanish .txt files.
-    """
-    if language == "es":
-        avatar_text = AVATAR_SHEET_ES.read_text(encoding="utf-8")
-        offer_text = OFFER_BRIEF_ES.read_text(encoding="utf-8")
-        beliefs_text = NECESSARY_BELIEFS_ES.read_text(encoding="utf-8")
-    else:
-        avatar_text = extract_pdf_text(str(AVATAR_SHEET_PDF))
-        offer_text = extract_pdf_text(str(OFFER_BRIEF_PDF))
-        beliefs_text = extract_pdf_text(str(NECESSARY_BELIEFS_PDF))
+    # Try language-specific doc list first, fall back to English list
+    lang_key = f"BRAND DOCS ({language.upper()})"
+    doc_list = instructions.get(lang_key) or instructions.get("BRAND DOCS", "")
+    doc_files = [f.strip() for f in doc_list.splitlines() if f.strip()]
 
-    return (
-        "=== AVATAR SHEET ===\n\n"
-        f"{avatar_text}\n\n"
-        "=== OFFER BRIEF ===\n\n"
-        f"{offer_text}\n\n"
-        "=== NECESSARY BELIEFS ===\n\n"
-        f"{beliefs_text}"
-    )
+    sections = []
+    for doc_file in doc_files:
+        doc_stem = Path(doc_file).stem
+        if language != "en":
+            # Match by stem in language subfolder — handles extension differences (e.g. .pdf → .txt)
+            lang_dir = BRAND_DIR / language
+            lang_matches = list(lang_dir.glob(f"{doc_stem}.*")) if lang_dir.exists() else []
+            doc_path = lang_matches[0] if lang_matches else BRAND_DIR / doc_file
+        else:
+            doc_path = BRAND_DIR / doc_file
+
+        if not doc_path.exists():
+            continue
+
+        if doc_path.suffix.lower() == ".pdf":
+            content = extract_pdf_text(str(doc_path))
+        else:
+            content = doc_path.read_text(encoding="utf-8")
+
+        section_name = doc_path.stem.upper().replace("-", " ").replace("_", " ")
+        sections.append(f"=== {section_name} ===\n\n{content}")
+
+    return "\n\n".join(sections)
 
 
 def _brand_context_block(brand_context: str) -> dict:
-    """Reusable cached block containing the full brand context."""
     return {
         "type": "text",
-        "text": f"## BRAND CONTEXT (Avatar Sheet + Offer Brief + Necessary Beliefs)\n\n{brand_context}",
+        "text": f"## BRAND CONTEXT\n\n{brand_context}",
         "cache_control": {"type": "ephemeral"},
     }
 
 
 def _language_directive(language: str) -> str:
-    """Return a language directive block for non-English languages, or empty string."""
     if language == "es":
+        instructions = load_brand_instructions()
+        brand_id = instructions.get("BRAND IDENTITY", "").split(",")[0].strip() or "the brand"
         return (
             "\n\n## LANGUAGE\n"
             "Write ALL output text in Spanish (Latin American). "
             "Use natural, conversational Latin American Spanish — not literal translations from English. "
-            "Keep the brand name 'Spicy Cubes Dailies' untranslated."
+            f"Keep the brand name '{brand_id}' untranslated."
         )
     return ""
+
+
+def _brand_identity() -> str:
+    instructions = load_brand_instructions()
+    return instructions.get("BRAND IDENTITY", "this brand")
 
 
 # ── Pass 1: Describe ──────────────────────────────────────────────────────
 
 def build_describe_system(brand_context: str, language: str = "en") -> list[dict]:
-    """System prompt for Pass 1: image description."""
     lang_block = _language_directive(language)
+    brand_id = _brand_identity()
     return [
         {
             "type": "text",
             "text": f"""\
-You are an expert direct-response advertising analyst working for Spicy Cubes Dailies, an enzyme-based gummy supplement for women's desire, energy, and mood.
+You are an expert direct-response advertising analyst working for {brand_id}.
 
 ## YOUR TASK
 Describe what you see in each ad creative. You may receive either:
@@ -85,7 +142,7 @@ Be precise and analytical:
 - **visual_elements**: Describe exactly what's shown — people, products, text overlays, colors, layout, UGC vs studio, screenshot vs lifestyle, etc. For videos, note the progression across frames and any on-screen text/captions.
 - **emotional_tone**: What feeling does this creative evoke? (e.g., vulnerable, empowered, clinical, playful, raw/confessional, aspirational)
 - **implied_message**: What is this creative trying to communicate to the viewer? What belief is it building or what objection is it overcoming? For videos, incorporate what the speaker says (from the transcript) into your analysis.
-- **target_awareness_level**: Using Eugene Schwartz's awareness spectrum, where does this creative meet the prospect? (unaware, problem-aware, solution-aware, product-aware, most-aware)
+- **target_awareness_level**: Using the brand's belief framework, where does this creative meet the prospect? (early belief-building, mid-funnel, conversion-ready)
 - **transcript_summary**: (Videos only) Summarize the key message and selling points from the audio transcript in 1-2 sentences. Leave empty for images.
 
 Think like a media buyer analyzing creatives for pattern recognition.{lang_block}""",
@@ -98,13 +155,13 @@ Think like a media buyer analyzing creatives for pattern recognition.{lang_block
 # ── Pass 1 (Static): Describe Static Ad Creatives ────────────────────────
 
 def build_describe_static_system(brand_context: str, language: str = "en") -> list[dict]:
-    """System prompt for Pass 1 in --static mode: description with OCR of text overlays."""
     lang_block = _language_directive(language)
+    brand_id = _brand_identity()
     return [
         {
             "type": "text",
             "text": f"""\
-You are an expert direct-response advertising analyst working for Spicy Cubes Dailies, an enzyme-based gummy supplement for women's desire, energy, and mood.
+You are an expert direct-response advertising analyst working for {brand_id}.
 
 ## YOUR TASK
 Describe what you see in each STATIC ad creative (jpg/png/webp). These are designed graphic ads — not UGC video frames. They typically contain text overlays such as headlines, body copy, calls-to-action, captions, or taglines baked directly into the image.
@@ -115,7 +172,7 @@ Be precise and analytical:
 - **visual_elements**: Describe exactly what's shown — people, products, colors, layout, design style (text-heavy graphic, lifestyle photo with overlay, product hero, before/after, etc.). Note any design hierarchy (what the eye is drawn to first).
 - **emotional_tone**: What feeling does this creative evoke? (e.g., vulnerable, empowered, clinical, playful, aspirational, bold, intimate)
 - **implied_message**: What is this creative trying to communicate to the viewer? What belief is it building or what objection is it overcoming?
-- **target_awareness_level**: Using Eugene Schwartz's awareness spectrum, where does this creative meet the prospect? (unaware, problem-aware, solution-aware, product-aware, most-aware)
+- **target_awareness_level**: Using the brand's belief framework, where does this creative meet the prospect?
 - **overlay_copy**: READ ALL VISIBLE TEXT on the image verbatim — headlines, subheadlines, body copy, CTAs, captions, hashtags, ingredient callouts, guarantees, social proof snippets, anything printed on the creative. Quote it exactly as written. If there is no visible text, leave empty.
 - **transcript_summary**: Leave empty — this field is for video audio transcripts only.
 
@@ -129,41 +186,26 @@ Think like a media buyer AND a copywriter analyzing creatives for pattern recogn
 # ── Pass 2: Discover Categories ───────────────────────────────────────────
 
 def build_discover_system(brand_context: str, language: str = "en") -> list[dict]:
-    """System prompt for Pass 2: category discovery from image descriptions."""
     lang_block = _language_directive(language)
+    brand_id = _brand_identity()
     return [
         {
             "type": "text",
             "text": f"""\
-You are a world-class direct-response strategist channeling Eugene Schwartz's Breakthrough Advertising methodology. You work for Spicy Cubes Dailies, an enzyme-based gummy supplement for women's desire, energy, and mood.
+You are a world-class direct-response strategist and creative analyst. You work for {brand_id}.
 
 ## YOUR TASK
 Given text descriptions of all ad creatives in a batch, discover the natural creative concept categories that emerge. This is NOT about imposing categories top-down — it's about recognizing the distinct strategic approaches present in the actual creatives.
 
-## YOUR METHODOLOGY (Schwartz-Informed)
-
-### Market Sophistication Analysis
-Schwartz identified 5 stages of market sophistication. Each creative speaks to the prospect at a specific stage:
-1. **Stage 1 — Be First**: Simple, direct claim. "This gummy fixes your desire."
-2. **Stage 2 — Enlarge the Claim**: Bigger promise. "The #1 enzyme gummy for women over 30."
-3. **Stage 3 — Mechanism**: HOW it works becomes the differentiator. "The enzyme-activation pathway that probiotics can't touch."
-4. **Stage 4 — Mechanism + Proof**: Specific proof of the mechanism. "600mg fenugreek — the clinical dose most brands skip."
-5. **Stage 5 — Identification**: The prospect identifies with the message, not the claim. "I don't recognize myself anymore."
-
-### Awareness Level Mapping
-Each creative also meets the prospect at a specific awareness level:
-- **Unaware**: Doesn't know she has a problem
-- **Problem-Aware**: Knows the symptoms but not the cause or solution
-- **Solution-Aware**: Knows solutions exist but hasn't found the right one
-- **Product-Aware**: Knows about Spicy Cubes but hasn't bought
-- **Most-Aware**: Needs a nudge (deal, guarantee, social proof)
+## YOUR METHODOLOGY
+Use the brand's belief framework (from the brand context) to map each category to the belief it installs in the prospect's mind. Categories should reflect distinct strategic entry points — different beliefs, different awareness levels, different emotional angles.
 
 ### Category Discovery Rules
-1. Look for NATURAL clusters — images that share a strategic approach, not just visual similarity
-2. Each category should map to a specific belief from the Necessary Beliefs framework
+1. Look for NATURAL clusters — creatives that share a strategic approach, not just visual similarity
+2. Each category should map to a specific belief from the brand's belief framework
 3. Categories should be MECE (mutually exclusive, collectively exhaustive) for this batch
-4. Aim for 6-12 categories. Be GRANULAR — split broad themes into specific angles. For example, don't create one "identity reclamation" category when you could split it into "before/after transformation", "testimonial social proof", "product hero with identity messaging", etc.
-5. **HARD CONSTRAINT: No single category may contain more than 20% of the total images.** If a category is too large, split it into more specific sub-angles. A media buyer needs distinct ad sets — a 60-image catch-all defeats the purpose.
+4. Aim for 6-12 categories. Be GRANULAR — split broad themes into specific angles
+5. **HARD CONSTRAINT: No single category may contain more than 20% of the total images.** If a category is too large, split it into more specific sub-angles
 6. Name categories with descriptive snake_case slugs
 7. Each category must have a clear strategic purpose — "why would a media buyer group these together?"
 
@@ -171,8 +213,8 @@ Each creative also meets the prospect at a specific awareness level:
 Provide your reasoning for how you arrived at the categories, then list each category with:
 - A snake_case name and human-readable display name
 - A description of what unifies creatives in this category
-- Which Schwartz sophistication stage it targets
-- Which Necessary Belief(s) it builds
+- Which sophistication stage or awareness level it targets (use the brand's framework)
+- Which belief(s) it builds
 - Which images from the batch belong here{lang_block}""",
             "cache_control": {"type": "ephemeral"},
         },
@@ -183,28 +225,28 @@ Provide your reasoning for how you arrived at the categories, then list each cat
 # ── Pass 2b: Discover Video Hook Categories ──────────────────────────────
 
 def build_discover_video_system(brand_context: str, language: str = "en") -> list[dict]:
-    """System prompt for Pass 2b: discover video hook categories from video descriptions."""
     lang_block = _language_directive(language)
+    brand_id = _brand_identity()
     return [
         {
             "type": "text",
             "text": f"""\
-You are a world-class direct-response strategist and UGC video analyst for Spicy Cubes Dailies, an enzyme-based gummy supplement for women's desire, energy, and mood.
+You are a world-class direct-response strategist and UGC video analyst for {brand_id}.
 
 ## YOUR TASK
 Given text descriptions of UGC video ad creatives (including their opening hook transcripts), discover natural VIDEO HOOK categories. These categories are based on the OPENING HOOK — the first thing the viewer sees and hears in the first 5-10 seconds. The hook is what stops the scroll and determines ad performance.
 
 ## IMPORTANT
 - Categorize by the OPENING HOOK ANGLE, not by the overall content or mechanism discussed later
-- Most UGC videos eventually mention enzymes vs probiotics — that's a shared product talking point, NOT what makes hooks strategically distinct
-- The hook is the scroll-stopper: "Don't get scammed", "I didn't recognize myself anymore", "Last night my husband...", "The problem with probiotics..." are all different hooks even if the videos later converge on similar product messaging
+- Most UGC videos share product talking points — that's not what makes hooks strategically distinct
+- The hook is the scroll-stopper: different emotional or curiosity entry points are different categories even if videos later converge on similar messaging
 
 ## CATEGORY DISCOVERY RULES
 1. Look for distinct HOOK PATTERNS — what emotional/curiosity entry point does each video use?
 2. Categories should be MECE for this batch of videos
 3. Aim for 2-5 categories (fewer videos = fewer categories)
 4. Name categories with descriptive snake_case slugs that reflect the hook angle
-5. Map each category to the Necessary Belief it targets and Schwartz awareness level it enters at{lang_block}""",
+5. Map each category to the belief it targets and the awareness level it enters at{lang_block}""",
             "cache_control": {"type": "ephemeral"},
         },
         _brand_context_block(brand_context),
@@ -214,24 +256,18 @@ Given text descriptions of UGC video ad creatives (including their opening hook 
 # ── Pass 3: Classify ──────────────────────────────────────────────────────
 
 def build_classify_system(brand_context: str, categories: list[dict], language: str = "en") -> list[dict]:
-    """System prompt for Pass 3: classify images into discovered categories.
-
-    Args:
-        brand_context: Full brand context text.
-        categories: List of discovered category dicts with 'name', 'display_name', 'description'.
-        language: Pipeline language code.
-    """
     category_list = "\n".join(
         f"- **{cat['name']}** ({cat['display_name']}): {cat['description']}"
         for cat in categories
     )
     lang_block = _language_directive(language)
+    brand_id = _brand_identity()
 
     return [
         {
             "type": "text",
             "text": f"""\
-You are an expert direct-response advertising analyst for Spicy Cubes Dailies, an enzyme-based gummy supplement for women's desire, energy, and mood.
+You are an expert direct-response advertising analyst for {brand_id}.
 
 ## YOUR TASK
 Classify each ad creative into exactly ONE of the following creative concept categories. The creative may be an image or a video thumbnail (with an optional transcript excerpt for context). These categories were discovered from analysis of this specific batch of creatives.
@@ -240,17 +276,17 @@ Classify each ad creative into exactly ONE of the following creative concept cat
 {category_list}
 
 ## HOW TO CLASSIFY
-Use the brand's foundational documents (Avatar Sheet, Offer Brief, Necessary Beliefs) to inform your decision:
+Use the brand's foundational documents (from the brand context) to inform your decision:
 
-1. **Match the belief being built**: Each category maps to a Necessary Belief. Ask: "Which belief is this image primarily trying to build in the prospect's mind?" Reference the Necessary Beliefs document to understand what each belief means and how it manifests.
-2. **Read the avatar**: Use the Avatar Sheet to understand the emotional state and language the image is speaking to. A woman staring at pills in frustration maps differently than a woman smiling with confidence.
-3. **Consider the offer angle**: Use the Offer Brief to understand which part of the product story this image supports — mechanism, social proof, identity, dosing science, failed alternatives, or permission/guarantee.
-4. **Awareness level**: Where does this image meet the prospect on Schwartz's awareness spectrum? That often determines category fit.
+1. **Match the belief being built**: Each category maps to a belief in the brand's framework. Ask: "Which belief is this creative primarily trying to build in the prospect's mind?"
+2. **Read the avatar**: Use the avatar sheet to understand the emotional state and language the creative is speaking to.
+3. **Consider the offer angle**: Use the offer brief to understand which part of the brand story this creative supports.
+4. **Awareness level**: Where does this creative meet the prospect?
 
 ## RULES
 - Choose the single BEST category for each image
 - Provide clear reasoning that references which belief, avatar pain point, or offer angle drove your decision
-- If an image could fit multiple categories, choose the one that best represents the image's PRIMARY strategic intent{lang_block}""",
+- If a creative could fit multiple categories, choose the one that best represents its PRIMARY strategic intent{lang_block}""",
             "cache_control": {"type": "ephemeral"},
         },
         _brand_context_block(brand_context),
@@ -260,10 +296,6 @@ Use the brand's foundational documents (Avatar Sheet, Offer Brief, Necessary Bel
 # ── Pass 3b: Visual Sub-grouping ─────────────────────────────────────────
 
 def build_subgroup_system() -> list[dict]:
-    """System prompt for Pass 3b: visual sub-grouping within a concept.
-
-    No brand context or language needed — this is purely visual analysis.
-    """
     return [
         {
             "type": "text",
@@ -297,18 +329,18 @@ Cluster images based on these visual attributes — NOT by message, copy, or str
 # ── Pass 3b: Label Sub-groups with Strategic Concepts ────────────────────
 
 def build_label_subgroup_system(brand_context: str, categories: list[dict], language: str = "en") -> list[dict]:
-    """System prompt for labeling visual sub-groups with strategic concept categories."""
     category_list = "\n".join(
         f"- **{cat['name']}** ({cat['display_name']}): {cat['description']}"
         for cat in categories
     )
     lang_block = _language_directive(language)
+    brand_id = _brand_identity()
 
     return [
         {
             "type": "text",
             "text": f"""\
-You are an expert direct-response advertising analyst for Spicy Cubes Dailies, an enzyme-based gummy supplement for women's desire, energy, and mood.
+You are an expert direct-response advertising analyst for {brand_id}.
 
 ## YOUR TASK
 You will receive a visual sub-group of ad creatives — images that have already been clustered together because they look visually similar. Your job is to assign this sub-group to exactly ONE strategic concept category.
@@ -317,12 +349,12 @@ You will receive a visual sub-group of ad creatives — images that have already
 {category_list}
 
 ## HOW TO LABEL
-Use the brand's foundational documents (Avatar Sheet, Offer Brief, Necessary Beliefs) to inform your decision:
+Use the brand's foundational documents (from the brand context) to inform your decision:
 
 1. **Look at the representative images**: What belief are these creatives primarily building?
 2. **Consider the sub-group as a whole**: The entire sub-group should map to one strategic concept.
-3. **Match the belief being built**: Each category maps to a Necessary Belief. Ask: "Which belief is this sub-group of creatives primarily trying to build in the prospect's mind?"
-4. **Awareness level**: Where do these creatives meet the prospect on Schwartz's awareness spectrum?
+3. **Match the belief being built**: Each category maps to a belief in the brand's framework.
+4. **Awareness level**: Where do these creatives meet the prospect?
 
 ## RULES
 - Choose the single BEST category for the entire sub-group
@@ -338,13 +370,6 @@ Use the brand's foundational documents (Avatar Sheet, Offer Brief, Necessary Bel
 # ── Pass 4: Copy Generation ──────────────────────────────────────────────
 
 def build_copygen_system(brand_context: str, categories: list[dict], language: str = "en") -> list[dict]:
-    """System prompt for Pass 4: generate copy per concept group.
-
-    Args:
-        brand_context: Full brand context text.
-        categories: List of discovered category dicts.
-        language: Pipeline language code.
-    """
     category_context = "\n\n".join(
         f"### {cat['display_name']} (`{cat['name']}`)\n"
         f"{cat['description']}\n"
@@ -352,48 +377,24 @@ def build_copygen_system(brand_context: str, categories: list[dict], language: s
         f"Builds belief: {cat['belief_mapping']}"
         for cat in categories
     )
-
-    if language == "es":
-        copy_rules = """\
-## COPY RULES
-- **Primary Text**: 2-4 sentences. Direct response style. Lead with a hook that stops the scroll. Use the avatar's real language — raw, relatable, conversational Latin American Spanish. Must build the belief mapped to the creative concept. End with a soft CTA or curiosity gap.
-- **Headline**: Under 40 characters. MUST be a clear BENEFIT statement — what the product does for her. Think product tagline, not story hook. Examples: "Vuelve a Sentirte Tú", "Enzimas, No Probióticos", "Balance Diario Sin Hinchazón", "Balance Femenino, Hecho Mejor", "Dosis Clínicas, Balance Real". Do NOT write story hooks, emotional statements, or narrative lines as headlines.
-- **Description**: 40-80 characters. MUST contain social proof, offer details, or guarantee info. Combine 2-3 of: star rating, review count, money-back guarantee, free shipping, cancel anytime, clinical doses, timeline of results. Examples: "5 ingredientes clínicos. Una gomita al día. Envío gratis.", "A base de enzimas. Sin probióticos. Sin hinchazón. Garantía 90 días.", "Garantía 90 días. Envío gratis. Cancela cuando quieras.", "4.8 estrellas. 350+ reseñas. La gomita que todas quieren.", "Menos hinchazón semana 1. Mejor ánimo semana 4. Una gomita." Do NOT write vague or emotional descriptions.
-
-## COPY STYLE GUIDELINES
-- Escribe como una mujer hablándole a su mejor amiga, no como una marca hablándole a una clienta
-- Usa el lenguaje real del avatar: "Ya no me reconozco," "tal vez así soy ahora," "amiga, igual yo"
-- Referencia puntos de dolor específicos: los probióticos que la hinchaban, los doctores que la ignoraron, la culpa de evitar el contacto con su pareja
-- Siempre diferencia: enzimas no probióticos, dosis clínicas no polvos mágicos, gomita grande no empaque bonito
-- Incluye detalles específicos cuando sea relevante: 600mg fenogreco, 500mg tribulus, 30mg azafrán, 120mg bromelina
-- Nunca seas moralista ni clínica. Sé honesta, cruda y da permiso.
-- Varía el ángulo emocional entre variaciones: mezcla hooks, tonos y ángulos de creencia dentro del concepto asignado"""
-    else:
-        copy_rules = """\
-## COPY RULES
-- **Primary Text**: 2-4 sentences. Direct response style. Lead with a hook that stops the scroll. Use the avatar's real language (Reddit-native, raw, relatable). Must build the belief mapped to the creative concept. End with a soft CTA or curiosity gap.
-- **Headline**: Under 40 characters. MUST be a clear BENEFIT statement — what the product does for her. Think product tagline, not story hook. Examples: "Feel Like Yourself Again", "Enzymes, Not Probiotics", "Daily Balance Without the Bloat", "Feminine Balance, Done Better", "Clinical Doses, Real Balance". Do NOT write story hooks, emotional statements, or narrative lines as headlines.
-- **Description**: 40-80 characters. MUST contain social proof, offer details, or guarantee info. Combine 2-3 of: star rating, review count, money-back guarantee, free shipping, cancel anytime, clinical doses, timeline of results. Examples: "5 clinical-dose ingredients. One gummy a day. Free shipping.", "Enzyme-based. No probiotics. No bloating. 90-day guarantee.", "90-day money-back guarantee. Free shipping. Cancel anytime.", "4.8 stars. 350+ reviews. The gummy women are flocking to.", "Less bloating week 1. Better mood by week 4. One gummy daily." Do NOT write vague or emotional descriptions.
-
-## COPY STYLE GUIDELINES
-- Write like a woman talking to her best friend, not a brand talking to a customer
-- Use the avatar's real language: "I don't recognize myself anymore," "maybe this is just who I am now," "girl, same"
-- Reference specific pain points: probiotics that bloated her, doctors who dismissed her, the guilt of avoiding her partner's touch
-- Always differentiate: enzymes not probiotics, clinical doses not fairy dust, oversized gummy not cute packaging
-- Include specific details when relevant: 600mg fenugreek, 500mg tribulus, 30mg saffron, 120mg bromelain
-- Never be preachy or clinical. Be honest, raw, and permission-giving.
-- Vary the emotional angle across variations: mix hooks, tones, and belief angles within the assigned concept"""
+    brand_id = _brand_identity()
+    copy_rules = _get_copy_rules(language)
+    copy_style = _get_copy_style(language)
 
     return [
         {
             "type": "text",
             "text": f"""\
-You are an expert direct-response copywriter for Spicy Cubes Dailies, an enzyme-based gummy supplement for women's desire, energy, and mood.
+You are an expert direct-response copywriter for {brand_id}.
 
 ## CREATIVE CONCEPT CATEGORIES (Discovered for This Batch)
 {category_context}
 
-{copy_rules}""",
+## COPY RULES
+{copy_rules}
+
+## COPY STYLE GUIDELINES
+{copy_style}""",
             "cache_control": {"type": "ephemeral"},
         },
         _brand_context_block(brand_context),
@@ -403,12 +404,11 @@ You are an expert direct-response copywriter for Spicy Cubes Dailies, an enzyme-
 # ── Pass 4 (Static): Copy Generation for Static Ads ─────────────────────
 
 def build_copygen_static_system(brand_context: str, categories: list[dict], language: str = "en") -> list[dict]:
-    """System prompt for Pass 4 in --static mode: copy generation aware of existing overlay text.
+    """Copy generation aware of existing overlay text on static ad creatives.
 
-    Static ads already have copy baked into the image (headlines, body text, CTAs).
-    The generated copy (primary_text, headline, description) is the AD BODY — it lives in
-    the Facebook/Instagram post caption area alongside the image, not on the image itself.
-    It must complement and extend the visual's message, not restate it.
+    Static ads already have copy baked into the image. The generated copy
+    (primary_text, headline, description) is the AD BODY — it lives in the
+    post caption area alongside the image, not on the image itself.
     """
     category_context = "\n\n".join(
         f"### {cat['display_name']} (`{cat['name']}`)\n"
@@ -417,62 +417,34 @@ def build_copygen_static_system(brand_context: str, categories: list[dict], lang
         f"Builds belief: {cat['belief_mapping']}"
         for cat in categories
     )
-
-    if language == "es":
-        copy_rules = """\
-## COPY RULES FOR STATIC ADS
-Estas son creatividades estáticas — el texto ya está impreso en la imagen misma.
-El copy que vas a generar es el CUERPO DEL ANUNCIO: el texto del caption/post en Facebook/Instagram, NO el texto de la imagen.
-
-### Reglas clave:
-- **NO repitas** lo que ya dice la imagen — asume que el prospecto ya lo leyó
-- **EXTIENDE** el mensaje de la imagen: da más contexto, más prueba social, una historia más profunda, o un ángulo emocional complementario
-- Si la imagen tiene un headline fuerte, el `headline` generado debe ser DIFERENTE — un ángulo distinto del mismo concepto
-- Si la imagen tiene una CTA, el copy puede reforzarla o dar razones adicionales para hacer clic
-
-- **Primary Text**: 2-4 oraciones. Estilo DR. Gancho que para el scroll. Usa el lenguaje real del avatar — crudo, relatable, conversacional. Construye la creencia mapeada al concepto. El copy debe complementar VISUALMENTE la imagen, no contradecirla. Termina con CTA suave o curiosity gap.
-- **Headline**: Menos de 40 caracteres. Beneficio claro y directo. Diferente del headline impreso en la imagen si hay uno. Ejemplos: "Vuelve a Sentirte Tú", "Enzimas, No Probióticos", "Balance Diario Sin Hinchazón".
-- **Description**: 40-80 caracteres. Prueba social, detalles de oferta, o garantía. Combina 2-3 de: calificación de estrellas, conteo de reseñas, garantía de devolución, envío gratis, cancela cuando quieras, dosis clínicas, timeline de resultados.
-
-## ESTILO
-- Escribe como una mujer hablándole a su mejor amiga
-- Usa el lenguaje real del avatar: "Ya no me reconozco," "tal vez así soy ahora"
-- Diferencia siempre: enzimas no probióticos, dosis clínicas no polvos mágicos
-- Nunca seas moralista ni clínica. Sé honesta, cruda y da permiso.
-- Varía el ángulo emocional entre variaciones"""
-    else:
-        copy_rules = """\
-## COPY RULES FOR STATIC ADS
-These are static graphic ads — the copy is already printed on the image itself.
-The copy you're generating is the AD BODY: the Facebook/Instagram caption/post text that appears alongside the image, NOT text on the image.
-
-### Key rules:
-- **DO NOT restate** what the image already says — assume the prospect has already read it
-- **EXTEND** the image's message: add more context, more proof, a deeper story, or a complementary emotional angle
-- If the image has a strong headline, the generated `headline` must be DIFFERENT — a distinct angle on the same concept
-- If the image has a CTA, the copy can reinforce it or give additional reasons to click
-
-- **Primary Text**: 2-4 sentences. Direct response style. Hook that stops the scroll. Use the avatar's real language (raw, relatable). Must build the belief mapped to the concept. Copy should visually complement the image, not contradict it. End with a soft CTA or curiosity gap.
-- **Headline**: Under 40 characters. Clear benefit statement. Must be DIFFERENT from any headline already on the image. Examples: "Feel Like Yourself Again", "Enzymes, Not Probiotics", "Daily Balance Without the Bloat".
-- **Description**: 40-80 characters. Social proof, offer details, or guarantee. Combine 2-3 of: star rating, review count, money-back guarantee, free shipping, cancel anytime, clinical doses, timeline of results.
-
-## COPY STYLE
-- Write like a woman talking to her best friend, not a brand talking to a customer
-- Use the avatar's real language: "I don't recognize myself anymore," "maybe this is just who I am now"
-- Always differentiate: enzymes not probiotics, clinical doses not fairy dust
-- Never be preachy or clinical. Be honest, raw, and permission-giving.
-- Vary the emotional angle across variations: mix hooks, tones, and belief angles within the assigned concept"""
+    brand_id = _brand_identity()
+    copy_rules = _get_copy_rules(language)
+    copy_style = _get_copy_style(language)
 
     return [
         {
             "type": "text",
             "text": f"""\
-You are an expert direct-response copywriter for Spicy Cubes Dailies, an enzyme-based gummy supplement for women's desire, energy, and mood.
+You are an expert direct-response copywriter for {brand_id}.
 
 ## CREATIVE CONCEPT CATEGORIES (Discovered for This Batch)
 {category_context}
 
-{copy_rules}""",
+## STATIC AD CONTEXT
+These are static graphic ads — copy is already printed on the image itself.
+The copy you're generating is the POST BODY: the Facebook/Instagram caption that appears alongside the image, NOT text on the image.
+
+### Key rules for static ads:
+- **DO NOT restate** what the image already says — assume the prospect has already read it
+- **EXTEND** the image's message: add more context, more proof, a deeper story, or a complementary emotional angle
+- If the image has a strong headline, the generated `headline` must be DIFFERENT — a distinct angle on the same concept
+- If the image has a CTA, the copy can reinforce it or give additional reasons to click
+
+## COPY RULES
+{copy_rules}
+
+## COPY STYLE GUIDELINES
+{copy_style}""",
             "cache_control": {"type": "ephemeral"},
         },
         _brand_context_block(brand_context),
@@ -482,5 +454,4 @@ You are an expert direct-response copywriter for Spicy Cubes Dailies, an enzyme-
 # ── Legacy compatibility ──────────────────────────────────────────────────
 
 def build_system_messages(brand_context: str) -> list[dict]:
-    """Default system messages (used by describe pass)."""
     return build_describe_system(brand_context)

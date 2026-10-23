@@ -1,0 +1,110 @@
+{
+  "graph_api_version": "v21.0",
+  "dotenv_paths": [
+    "/Users/colefreeman/Desktop/meta-automation/dashboard/.env.local",
+    "/Users/colefreeman/Desktop/meta-automation/.env"
+  ],
+  "attribution_windows": ["7d_click", "1d_view"],
+  "ad_account_id": "1862723677525967",
+  "breakeven_roas": 1.40,
+  "scaling_roas": 2.40,
+  "scale_tier": {
+    "min_spend": 100.0,
+    "min_purchases": 3
+  },
+  "funded": {
+    "spend_multiple_of_median": 3.0,
+    "min_spend_abs": 50.0
+  },
+  "routes": {
+    "breakthrough": "ABO-scale 10-20%",
+    "spend_winner": "ABO-throttle ~5%",
+    "kpi_winner": "ABO-push ~5%",
+    "loser": "Graveyard",
+    "none": "Keep-in-arena"
+  },
+  "percentiles": {
+    "path_threshold": 75,
+    "top_decile": 90,
+    "diagnosis_high": 75,
+    "diagnosis_low": 50
+  },
+  "pool_classification": {
+    "retargeting_campaign_name_contains": ["Retargeting"],
+    "graveyard_campaign_name_contains": ["Graveyard", "Zombie"],
+    "default_pool": "prospecting"
+  },
+  "paths": {
+    "hook": {
+      "type": "percentile",
+      "metric": "thumbstop",
+      "floor": {"impressions": 500},
+      "video_only": true
+    },
+    "hold": {
+      "type": "percentile",
+      "metric": "hold_rate",
+      "floor": {"video_3s_views": 300},
+      "video_only": true
+    },
+    "ctr": {
+      "type": "percentile",
+      "metric": "link_ctr",
+      "floor": {"impressions": 1000}
+    },
+    "efficiency": {
+      "type": "fixed",
+      "metric": "roas",
+      "min_purchases": 1,
+      "min_roas": 2.40,
+      "floor": {"impressions": 500}
+    },
+    "intent": {
+      "type": "fixed",
+      "metric": "intent_rate",
+      "min_value": 0.4,
+      "floor": {"spend": 15.0}
+    },
+    "algorithm_favorite": {
+      "type": "rule",
+      "spend_multiple_of_median": 3.0,
+      "median_min_spend": 1.0,
+      "min_spend_abs": 50.0
+    }
+  },
+  "f2_inclusion": {
+    "min_paths": 2,
+    "any_top_decile": true,
+    "top_decile_paths": ["hook", "hold", "ctr", "efficiency", "intent"]
+  },
+  "pull": {
+    "insights_limit": 500,
+    "batch_ids_chunk": 50,
+    "insights_fields": [
+      "ad_id", "ad_name", "adset_id", "adset_name", "campaign_id", "campaign_name",
+      "spend", "impressions", "reach", "frequency", "ctr", "cpm",
+      "inline_link_click_ctr", "outbound_clicks", "outbound_clicks_ctr",
+      "actions", "action_values", "cost_per_action_type",
+      "video_play_actions", "video_continuous_2_sec_watched_actions",
+      "video_thruplay_watched_actions", "video_avg_time_watched_actions",
+      "video_p25_watched_actions", "video_p50_watched_actions",
+      "video_p75_watched_actions", "video_p100_watched_actions",
+      "cost_per_thruplay", "purchase_roas"
+    ],
+    "lifetime_fields": [
+      "ad_id", "ad_name", "spend", "impressions", "actions", "action_values", "purchase_roas"
+    ],
+    "ad_fields": "name,status,adset_id,preview_shareable_link,creative{id,thumbnail_url,video_id,instagram_permalink_url}",
+    "adset_fields": "name,status,campaign_id,daily_budget"
+  },
+  "join": {
+    "transcripts_glob": "output/consolidated_*.json",
+    "hook_similarity_threshold": 0.6
+  },
+  "data_dir": "weekly_review/data",
+  "include_brief": false,
+  "drive": {
+    "spicy_cubes_folder_id": "1Dp7wVzmpFXprp3dTHKwi2G0rRz_rAdAC",
+    "weekly_reviews_folder_id": "1OKUGwwLVTiOVmwvVOr-o-9Z_ttyaG8rd"
+  }
+}

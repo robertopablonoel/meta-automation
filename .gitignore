@@ -8,3 +8,7 @@ input_images/
 venv/
 shortsleaderboard/
 input_images_old/
+weekly_review/data/
+weekly_review/client_secret.json
+weekly_review/token.json
+weekly_review/data/
